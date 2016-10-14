@@ -1,6 +1,7 @@
+sudo: required
+dist: trusty
+
 language: rust
-python:
-  - "3.5"
 rust:
   - stable
   - beta
@@ -8,6 +9,17 @@ rust:
 matrix:
   allow_failures:
     - rust: nightly
+
+addons:
+  apt:
+    sources:
+      - deadsnakes      # for python 3.5
+    packages:
+      - build-essential
+      - python3.5
+      - python3.5-dev
+      - libc6
+
 notifications:
   email: false
 # script: make all

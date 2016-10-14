@@ -4,9 +4,10 @@ version = "0.1.0"
 authors = ["Sergey Pashinin <sergey@pashinin.com>"]
 
 
-# [lib]
-# name = "parser"
-# crate-type = ["dylib"]
+[lib]
+name = "parser"
+crate-type = ["staticlib"]
+# dylib, rlib, staticlib
 
 
 [dependencies]
