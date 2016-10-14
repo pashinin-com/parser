@@ -1,0 +1,16 @@
+[package]
+name = "parser"
+version = "0.1.0"
+authors = ["Sergey Pashinin <sergey@pashinin.com>"]
+
+
+[lib]
+name = "parser"
+crate-type = ["dylib"]
+
+
+[dependencies]
+# interpolate_idents = "0.0.9"
+nom = "*"
+# itertools = "*"
+cpython = { git = "https://github.com/dgrunwald/rust-cpython.git" }
