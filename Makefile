@@ -13,3 +13,6 @@ ds:
 
 rd:
 	cargo rustc --release -- -C prefer-dynamic
+
+test:
+	cargo test
