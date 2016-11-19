@@ -46,7 +46,6 @@ pub struct Command {
     // contents: Vec<Node>,
 }
 
-
 impl Command{
     pub fn finalize(&self) -> Box<ToHtml> {
         Box::new(Youtube{ video_code: self.contents.to_string() })
@@ -98,6 +97,21 @@ impl ToHtml for String {
     // }
 }
 
+
+#[derive(Debug)]
+pub struct URL<'a> {
+    pub proto: &'a str,
+    pub rest: &'a str,
+    // pub proto: String,
+    // pub contents: String,
+}
+impl<'a> ToHtml for URL<'a> {
+    fn html(&self) -> String {
+        let a = format!("<a href=\"{}://\">asd</a>", self.proto);
+        a.to_string()
+    }
+}
+
 // impl ToHtml for Command {
 //     fn html(&self) -> &String {
 //         //&"Asd".to_string()
@@ -128,3 +142,9 @@ impl ToHtml for Vec<Command> {
                       |mut i,j| {i.push_str(&*j.html()); i})     // &*j.html()
     }
 }
+// impl<'a> ToHtml for Vec<URL<'a> > {
+//     fn html(&self) -> String {
+//         self.iter().fold("".to_string(),
+//                       |mut i,j| {i.push_str(&*j.html()); i})     // &*j.html()
+//     }
+// }

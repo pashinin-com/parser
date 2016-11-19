@@ -98,7 +98,7 @@ fn html(py: Python, input_str: PyString) -> PyResult<PyString> {
 //     }
 // }
 
-py_module_initializer!(example, initexample, PyInit_example, |py, m| {
+py_module_initializer!(parser, initparser, PyInit_parser, |py, m| {
     // try!(module.add(py, "add_two", py_fn!(add_two)));
     try!(m.add(py, "__doc__", "Module documentation string"));
     try!(m.add(py, "run", py_fn!(py, run())));
