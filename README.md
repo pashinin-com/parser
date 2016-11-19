@@ -7,6 +7,11 @@
 This is a Python 3.5 module (.so file). The main file is lib.rs where we
 define `PyInit_` function.
 
+## Libraries used
+
+[Nom](https://github.com/Geal/nom) - Rust parsing library
+
+
 ## Rust
 
 ### Install and update
