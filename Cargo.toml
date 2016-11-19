@@ -6,7 +6,7 @@ authors = ["Sergey Pashinin <sergey@pashinin.com>"]
 
 [lib]
 name = "parser"
-crate-type = ["staticlib"]
+crate-type = ["dylib"]
 # dylib, rlib, staticlib
 
 
