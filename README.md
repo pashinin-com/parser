@@ -9,7 +9,7 @@ define `PyInit_` function.
 
 ## Libraries used
 
-[Nom](https://github.com/Geal/nom) - Rust parsing library
+[Nom](https://github.com/Geal/nom) - Rust parsing library. [Docs](http://rust.unhandledexpression.com/nom/)
 
 
 ## Rust
