@@ -13,17 +13,23 @@ extern crate cpython;
 #[macro_use]
 extern crate nom;
 // use nom::{IResult, space, alpha, alphanumeric, digit};
-use nom::{IResult};
-
+// use nom::{IResult};
+// use nom::IResult::*;
+use cpython::ToPyObject;
 
 pub use self::parser::*;
 pub mod parser;
 pub use self::generator::*;
 pub mod generator;
 
+mod paragraph;
+mod article;
+mod node;
+use self::article::*;
+
 
 // PyTuple, PyDict, ToPyObject, PythonObject
-use cpython::{PyObject, PyResult, Python, PyString};
+use cpython::{PyObject, PyResult, Python, PyString, PyTuple};
 
 fn run(py: Python) -> PyResult<PyObject> {
     println!("Rust says: Hello Python!");
@@ -31,25 +37,16 @@ fn run(py: Python) -> PyResult<PyObject> {
 }
 
 
-fn html(py: Python, input_str: PyString) -> PyResult<PyString> {
-    // let mut v: Vec<Box<ToHtml>> = Vec::with_capacity(100);
-
-    // let mut v = Vec::with_capacity(100);
-    // let el = Node{text:"asd".to_string()};
-    // v.push(Box::new("test".to_string()));
-    // name_parser("hello Kimberly".as_bytes()) {
-    //     IResult::Done(rest, output) => {
-    //         println!("OK!");
-    //     }
-    // }
-
-
+fn ast(py: Python, input_str: PyString) -> PyResult<PyString> {
     // println!("Rust says: {}", s.to_string(py));
-    // println!("Rust says: {}", r);
+    // let res = parse(&input);
+    // let a = Article::new(input_str);
 
     match input_str.to_string(py) {
-        Ok(input) => {
-            let greetings = format!("Rust says: Greetings {} !", input);
+        // Ok(input) => {
+        Ok(s) => {
+            // let greetings = format!("Rust says: Greetings {} !", input);
+            // Value::Svalue(ScalarValue::Integer32(3))]
             // let greetings = format!("Rust says: Greetings {} !", input);
             // let v: Vec<Box<ToHtml>> = parse(input.to_string());
 
@@ -70,43 +67,43 @@ fn html(py: Python, input_str: PyString) -> PyResult<PyString> {
 
             // let r = generate_html(&v);
             // Ok(PyString::new(py, &r))
-            let output = PyString::new(py, &greetings);
-            Ok(output)
+
+            // string
+            // let output = PyString::new(py, &greetings);
+            // Ok(output)
+            let a = Article::new(s);
+
+            // Ok(PyTuple::empty(py))
+            Ok(
+                a.to_py_object(py)
+                    // .into_object()
+                    // .to_py_object(py)
+                // PyTuple::new(py, &Vec::new())
+                // &PyString::new(py, &greetings)
+                // Value::Svalue(ScalarValue::Integer32(1)),
+                // Value::Svalue(ScalarValue::Integer32(2))
+            )
             // Ok(py.None())
         }
         Err(e) => Err(e)
     }
-
-
-    // Ok(py.None())
 }
 
-// fn add_two(py: Python, args: &PyTuple, _: Option<&PyDict>) -> PyResult<PyObject> {
-//     match args.as_slice() {
-//         [ref a_obj, ref b_obj] => {
-//             let a = a_obj.extract::<i32>(py).unwrap();
-//             let b = b_obj.extract::<i32>(py).unwrap();
-//             let mut acc:i32 = 0;
-
-//             for _ in 0..1000 {
-//                 acc += a + b;
-//             }
-
-//             Ok(acc.to_py_object(py).into_object())
-//         },
-//         _ => Ok(py.None())
-//     }
-// }
+fn html(py: Python, input_str: PyString) -> PyResult<PyString> {
+    match input_str.to_string(py) {
+        Ok(s) => {
+            let a = Article::new(s);
+            Ok(a.to_py_object(py))
+        }
+        Err(e) => Err(e)
+    }
+}
 
 py_module_initializer!(parser, initparser, PyInit_parser, |py, m| {
     // try!(module.add(py, "add_two", py_fn!(add_two)));
     try!(m.add(py, "__doc__", "Module documentation string"));
     try!(m.add(py, "run", py_fn!(py, run())));
+    try!(m.add(py, "ast", py_fn!(py, ast(input: PyString))));
     try!(m.add(py, "html", py_fn!(py, html(input: PyString))));
     Ok(())
 });
-
-// py_module_initializer!(example, initexample, PyInit_example, |py, m| {
-//     try!(m.add(py, "hello", py_fn!(py, hello())));
-//     Ok(())
-// });

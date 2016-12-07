@@ -9,8 +9,15 @@ define `PyInit_` function.
 
 ## Libraries used
 
+https://github.com/dgrunwald/rust-cpython
 [Nom](https://github.com/Geal/nom) - Rust parsing library. [Docs](http://rust.unhandledexpression.com/nom/)
 
+## Commands
+
+```bash
+# generates documentation in target/doc folder
+cargo doc
+```
 
 ## Rust
 
@@ -53,6 +60,13 @@ Cargo.toml
 
 ```bash
 # dylib, rlib, staticlbig
+```
 
+Apply certain traits:
 
 ```
+#[derive(Debug)]
+#[derive(PartialEq, PartialOrd)]
+```
+
+### Cow - copy on write

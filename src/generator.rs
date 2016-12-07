@@ -4,35 +4,23 @@
 // use cpython::{PyObject, PyResult, Python, PyString};
 use std::string::String;
 use std::fmt;
+// use cpython::{ToPyObject, PyTuple};
+use std::fmt::Debug;
+use std::cmp::PartialEq;
 
 // #[derive(Debug)]
-pub trait ToHtml {
+pub trait Html {
     fn html(&self) -> String;
     // fn fmt(&self, &mut fmt::Formatter) -> Result<(), fmt::Error>;
     // fn fmt(&self, &mut fmt::Formatter) -> Result<(), fmt::Error>;
 }
 
-impl fmt::Display for Box<ToHtml> {
+
+impl fmt::Display for Box<Html> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.html())
     }
 }
-// impl PartialEq for Box<ToHtml> {
-//     // fn eq(&self, other: &Box<ToHtml>) -> bool {
-//     //     self.html() == other.html()
-//     // }
-//     fn eq(&self, other: &str) -> bool {
-//         self.html() == other
-//     }
-// }
-// impl Eq for Box<ToHtml> {
-//     fn eq(&self, other: &Box<ToHtml>) -> bool {
-//         self.html() == other.html()
-//     }
-//     // fn eq(&self, other: &str) -> bool {
-//     //     self.html() == other
-//     // }
-// }
 
 
 
@@ -47,7 +35,7 @@ pub struct Command {
 }
 
 impl Command{
-    pub fn finalize(&self) -> Box<ToHtml> {
+    pub fn finalize(&self) -> Box<Html> {
         Box::new(Youtube{ video_code: self.contents.to_string() })
     }
 }
@@ -71,13 +59,13 @@ pub struct Youtube {
 //     // parent: ToHTML,
 // }
 
-impl ToHtml for Command {
+impl Html for Command {
     fn html(&self) -> String {
         self.finalize().html()
     }
 }
 
-impl ToHtml for Youtube {
+impl Html for Youtube {
     fn html(&self) -> String {
         // Box::new(
         let greetings = format!("https://youtube.com/{}", self.video_code);
@@ -86,9 +74,8 @@ impl ToHtml for Youtube {
     }
 }
 
-impl ToHtml for String {
+impl Html for String {
     fn html(&self) -> String {
-        // "Asd".to_string()
         (**self).to_string()
     }
     // fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -98,53 +85,37 @@ impl ToHtml for String {
 }
 
 
+#[derive(PartialEq)]
 #[derive(Debug)]
 pub struct URL<'a> {
     pub proto: &'a str,
-    pub rest: &'a str,
+    pub hostname: &'a str,
+    pub path: &'a str,
+    pub query: Option<&'a str>,
     // pub proto: String,
     // pub contents: String,
 }
-impl<'a> ToHtml for URL<'a> {
+impl<'a> Html for URL<'a> {
     fn html(&self) -> String {
-        let a = format!("<a href=\"{}://\">asd</a>", self.proto);
+        let a = format!(
+            "<a href=\"{}://{}{}\">asd</a>",
+            self.proto,
+            self.hostname,
+            self.path
+        );
         a.to_string()
     }
 }
 
-// impl ToHtml for Command {
-//     fn html(&self) -> &String {
-//         //&"Asd".to_string()
-//         &self.text
-//     }
-//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//         //write!(f, "({}, {})", self.x, self.y)
-//         write!(f, "123")
-//     }
-// }
-
-// impl fmt::Display for Node {
-//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//         write!(f, "({}, {})", self.x, self.y)
-//     }
-// }
-
-
-impl ToHtml for Vec<Box<ToHtml> > {
+impl Html for Vec<Box<Html> > {
     fn html(&self) -> String {
         self.iter().fold("".to_string(),
                       |mut i,j| {i.push_str(&*j.html()); i})     // &*j.html()
     }
 }
-impl ToHtml for Vec<Command> {
+impl Html for Vec<Command> {
     fn html(&self) -> String {
         self.iter().fold("".to_string(),
                       |mut i,j| {i.push_str(&*j.html()); i})     // &*j.html()
     }
 }
-// impl<'a> ToHtml for Vec<URL<'a> > {
-//     fn html(&self) -> String {
-//         self.iter().fold("".to_string(),
-//                       |mut i,j| {i.push_str(&*j.html()); i})     // &*j.html()
-//     }
-// }
