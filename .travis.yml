@@ -48,7 +48,7 @@ install:
 script:
   - cargo build --verbose
   - cargo test --verbose
-  - make wheel
+  - python setup.py bdist_wheel
 
 after_script:
   - ls -la tmp/wheels
