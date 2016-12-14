@@ -76,7 +76,7 @@ deploy:
     skip_cleanup: true
     on:
       tags: true
-      repo: pashinin/rparser
+      # repo: pashinin-com/parser
 
 
 notifications:
