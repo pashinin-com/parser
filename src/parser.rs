@@ -13,9 +13,12 @@ use nom::IResult::{Done, Incomplete, Error};
 use std::str;
 use std::str::from_utf8;
 // use nom::{alpha, alphanumeric};
-use nom::ErrorKind;
+use nom::{ErrorKind, Needed};
 // use nom::Err::Position;
 
+fn not_eol(chr:u8) -> bool {
+    chr != '\r' as u8 && chr == '\n' as u8
+}
 fn space_but_not_eol(chr:u8) -> bool {
     chr == ' ' as u8 || chr == '\t' as u8
 }
@@ -64,6 +67,30 @@ named!(paragraph_separator,
 );
 
 
+/// Comment
+named!(comment<Node>,
+       // recognize!(
+           do_parse!(
+               char!( '%' ) >>
+                   opt!(take_while!(space_but_not_eol)) >>
+                   txt: map_res!(is_not!( "\r\n" ), from_utf8) >>
+                   (Node::new_comment(txt))
+           )
+       // )
+);
+
+
+/// Header 2
+named!(h2<Node>,
+       do_parse!(
+           tag!( "##" ) >>
+               opt!(take_while!(space_but_not_eol)) >>
+               txt: map_res!(is_not!( "\r\n" ), from_utf8) >>
+               (Node::new_h2(txt))
+       )
+);
+
+
 // named!(space_or_end,
 //        alt!(
 //            eof     |
@@ -94,7 +121,6 @@ named!(url_proto,
        )
 );
 
-// is_not!( " \t\r\n" )
 
 /// Domain name
 ///
@@ -110,6 +136,89 @@ named!(domain_name,
            )
        )
 );
+
+/// Url query part:
+///
+/// Examples:
+///
+/// key=value
+/// key
+///
+/// Value can contain "=". Value ends on space or "&" sign
+named!(url_query_params1<(&str, &str)>,
+       alt_complete!(
+           // key=value
+           // complete!(
+           do_parse!(
+               key: map_res!(is_not!( " \r\n\t=" ), from_utf8) >>
+                   tag!("=") >>
+                   val: map_res!(is_not!( " \r\n\t&" ), from_utf8) >>
+                   (key, val)
+           )
+       // )
+               |
+           // // key
+           // complete!(
+           do_parse!(
+               key: map_res!(is_not!( " \r\n\t=" ), from_utf8) >>
+                   (key, "")
+           )
+       )
+);
+
+
+named!(code<Node>,
+       do_parse!(
+           tag!("```") >>
+               language: map_res!(take_while!(not_space), from_utf8) >>
+               txt: map_res!(take_until!("```"), from_utf8) >>
+               tag!("```") >>
+           // params: separated_list!(char!('&'), url_query_params1) >>
+           (Node::new_code(txt, language))
+               // (params.iter().fold(
+               //         HashMap::new(),
+               //         |mut T, tuple| {T.insert(tuple.0, tuple.1); T})
+               // )
+       )
+);
+
+
+/// Url query params without first "?" sign
+///
+/// Returns: Vec<tuple>
+///
+/// Example input:
+///
+/// gfe_rd=cr&ei=zCZLWNPMHceAuAH2-oCYDw&gws_rd=ssl#newwindow=1&q=url+query+string
+///
+// HashMap<&'a str, &'a str>
+named!(url_query_params<Vec<(&str, &str)> >,
+// named!(url_query_params<HashMap<&str, &str> >,
+       do_parse!(
+           params: separated_list!(char!('&'), url_query_params1) >>
+           (params)
+               // (params.iter().fold(
+               //         HashMap::new(),
+               //         |mut T, tuple| {T.insert(tuple.0, tuple.1); T})
+               // )
+       )
+);
+
+
+named!(pub url_query<HashMap<&str, &str> >,
+       complete!(
+           do_parse!(
+               tag!("?") >>
+                   params: separated_list!(tag!("&"), url_query_params1) >>
+               // (params)
+                   (params.iter().fold(
+                       HashMap::new(),
+                       |mut T, tuple| {T.insert(tuple.0, tuple.1); T})
+                   )
+           )
+       )
+);
+
 
 #[test]
 fn test_domain() {
@@ -163,10 +272,11 @@ named!(hostname,
 named!(url<Node>,
     do_parse!(
         proto: map_res!(url_proto, from_utf8)  >>
-               tag!("://")   >>
-               hostname: map_res!(hostname, from_utf8) >>
-               path: opt!(map_res!(is_not!( "? \t\r\n" ), from_utf8)) >>
-               query: opt!(map_res!(is_not!( " \t\r\n" ), from_utf8)) >>
+            tag!("://")   >>
+            hostname: map_res!(hostname, from_utf8) >>
+            // path: opt!(map_res!(is_not!( "? \t\r\n" ), from_utf8)) >>
+            path: opt!(map_res!(is_not!( "? \t\r\n" ), from_utf8)) >>
+            query: opt!(map_res!(recognize!(url_query), from_utf8)) >>
             (
                 Node::new_url(
                     proto, hostname,
@@ -179,6 +289,7 @@ named!(url<Node>,
                         Some(x) => x,
                         None => "",
                     }
+                    // query
                 )
             )
        )
@@ -205,40 +316,35 @@ named!(symbols<Node>,
                (Node::new_text(txt))
        )
 );
-named!(tag, delimited!(char!('<'), alpha, char!('>')));
+
+named!(tag,
+       // delimited!(char!('<'), alpha, char!('>'))
+       recognize!(
+       do_parse!(
+           char!('<') >>
+               opt!(take_while!(any_space)) >>
+               name: map_res!(take_while!(not_space), from_utf8) >>
+               params: map_res!(is_not!( ">" ), from_utf8) >>
+               opt!(char!('/')) >>
+               char!('>') >>
+               ()
+       ))
+);
+
 named!(closing_tag, delimited!(tag!("</"), alpha, char!('>')));
 
 /// Anything between spaces in 1 paragraph
 named!(word<Node>,
        do_parse!(
            block: alt_complete!(
+               code |
+               h2 |
                url |
+               comment |
                symbols
            ) >>
-               // nl: opt!(word_separator) >>
-               // nl: alt_complete!(
-               //     opt!(take_while!(space_but_not_eol)) |
-               //     // nl: opt!(wordsep) >>
-               //         opt!(eol)
-               // ) >>
                (block)
        )
-       // recognize!(
-           // many1!(anychar)
-           // many1!(not!(call!(paragraph_separator)))
-       // not!(call!(paragraph_separator))
-       // take_until!(
-       // alt_complete!(
-       //         take_until!("\n\n") |
-       //         // tag!("\n\n")
-       //         // tag!("\n\n") |
-       //         take_until!("\r\n\r\n")
-       //         // take_until!(" ")
-       //         // recognize!(not!(eof!()))
-       //     )
-       // )
-           // many1!(not!(tag!("\n\n")))
-       // )
 );
 
 
@@ -263,123 +369,15 @@ named!(paragraph<Node>,
            // nl: opt!(take_while!(space_but_not_eol)) >>
                (
                    Node::new_paragraph(words)
-                   // Paragraph{
-                   //     // elements: None,
-                   //     src: txt.into()
-                   //     // src: "1111".into()
-                   // }
                )
        )
 );
 
-// named!(command<&[u8], Command>,
-//        chain!(
-//            tag!("\\") ~
-//            // name: map_res!(recognize!(take_while!( alphanumeric )), from_utf8) ~
-//            name: map_res!(take_until!("}"), from_utf8) ~
-//            // map_res!(recognize!(
-//            //         chain!(
-//            //             take_while!( alphanumeric ) ~
-//            //                 take_while!( alphanumeric ),
-//            //             ||{}
-//            //         )
-//            // ), from_utf8)
-//            // map_res!(is_a!(  ), from_utf8)~
-
-//                tag!("{")~
-//                contents: map_res!(take_until!("}"), from_utf8) ~
-//                tag!("}"),
-//            ||{
-//                Command{
-//                    name: name.to_string(),
-//                    contents: contents.to_string(),
-//                }
-//                //.finalize()
-//                // Box::new(
-//                //     Command{text: name.to_string()}
-//                // )
-//            }
-
-//        )
-// );
 
 
-// named!(
-//     parse <&str, Vec<URL> >,
-//     many0!(
-//         alt_complete!(
-//             // command |
-//             url
-//         )
-//     )
-//        // chain!(
-//            // ||{
-//            //     let v: Vec<Box<ToHtml>> = vec![];
-//            //     v
-//            //     // -> IResult<&[u8], Vec<Sequence>>
-//            //     // name
-//            //     // Command{
-//            //     //     name: name.to_string(),
-//            //     //     contents: contents.to_string(),
-//            //     // }.finalize()
-//            //     // Box::new(
-//            //     //     Command{text: name.to_string()}
-//            //     // )
-//            // }
-//        // )
-// );
-
-
-
-// #[test]
-// #[ignore]
-// fn check_complex() {
-//     let mut tests = HashMap::new();
-//     tests.insert(
-//         "\\youtube{1}\\youtube{2}",
-//         "My favorite book."
-//     );
-
-//     for (src, html) in &tests {
-//         // println!("{}: \"{}\"", book, review);
-//         match url(&src.to_string()) {
-//             Done(_, out) => {
-//                 // assert_eq!(out, Command{
-//                 //     name: "youtube".to_string(),
-//                 //     contents: "code123".to_string(),
-//                 // }.finalize());
-//                 assert_eq!(out.html(), html.to_string());
-//                 // assert_eq!(in_, "");
-//             },
-//             Incomplete(x) => panic!("incomplete: {:?}", x),
-//             Error(e) => panic!("error: {:?}", e),
-//         }
-//     }
-// }
-
-
-// #[test]
-// #[ignore]
-// fn check_command() {
-//     let mut tests = HashMap::new();
-//     tests.insert(
-//         "\\youtube{1}".as_bytes(),
-//         "https://youtube.com/1".as_bytes()
-//     );
-
-//     for (input, expected) in &tests {
-//         // println!("{}: \"{}\"", book, review);
-//         match url(src) {  // &src.to_string()
-//             Done(_, output) => {
-//                 assert_eq!(output.html(), html.to_string());
-//                 // assert_eq!(in_, "");
-//             },
-//             Incomplete(x) => panic!("incomplete: {:?}", x),
-//             Error(e) => panic!("error: {:?}", e),
-//         }
-//     }
-// }
-
+//
+// Tests
+//
 
 #[test]
 fn test_hostname() {
@@ -497,6 +495,62 @@ fn test_word_separator() {
     // for (input, expected) in &tests {assert_eq!(word_separator(input), *expected);}
     for (input, expected) in &tests {assert_eq!(word_separator(input), *expected);}
 }
+
+
+#[test]
+fn test_url_query_params() {
+    let mut tests = HashMap::new();
+    // key=value & key2=value2
+    tests.insert(
+        &b"gfe_rd=cr&ei=zCZLWNPMHceAuAH2-oCYDw&gws_rd=ssl#newwindow=1&q=url+query+string"[..],
+        Done(&b""[..], vec![
+            ("gfe_rd", "cr"),
+            ("ei", "zCZLWNPMHceAuAH2-oCYDw"),
+            ("gws_rd", "ssl#newwindow=1"),
+            ("q", "url+query+string"),
+        ])
+    );
+
+    // test a key without a value:  /path?param
+    // param   -  ("param", "")
+    // tests.insert(
+    //     &b"key"[..],
+    //     Done(&b""[..], vec![
+    //         ("key", ""),
+    //     ])
+    // );
+
+    // tests.insert(&b""[..], Done(&b""[..], vec![]));
+    for (input, expected) in &tests {assert_eq!(url_query_params(input), *expected);}
+}
+
+
+#[test]
+fn test_url_query_params1() {
+    // key=value
+    // key
+    let mut tests = HashMap::new();
+    tests.insert(&b"key=value"[..], Done(&b""[..], ("key", "value")));
+    tests.insert(&b"key"[..], Done(&b""[..], ("key", "")));
+    // tests.insert(&b"key="[..], Incomplete(Needed::Size(4)));
+    tests.insert(&b"key="[..], Done(&b""[..], ("key", "")));
+    for (input, expected) in &tests {assert_eq!(url_query_params1(input), *expected);}
+}
+
+
+#[test]
+fn test_url_query() {
+    let mut tests = HashMap::new();
+    tests.insert(
+        &b"?d=1"[..],
+        Done(&b""[..], vec![("d", "1")])
+    );
+    // tests.insert(&b""[..], Done(&b""[..], vec![]));
+    for (input, expected) in &tests {assert_eq!(url_query(input), *expected);}
+}
+
+// url_query
+
 
 #[test]
 fn test_parse() {

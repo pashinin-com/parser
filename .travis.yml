@@ -6,9 +6,20 @@ rust:
   - stable
   - beta
   - nightly
+
+python:
+  - "3.5"
+  # - "nightly" # currently points to 3.7-dev
+  - "pypy"
+
 matrix:
+  include:
+    - os: osx
+    - os: linux
+
   allow_failures:
     - rust: nightly
+
 
 addons:
   apt:
@@ -20,8 +31,27 @@ addons:
       - python3.5-dev
       - libc6
 
+
+
+
+# install:
+#   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then docker pull $DOCKER_IMAGE; fi
+
+#
+# defaults
+#
+# script:
+# - cargo build --verbose
+# - cargo test --verbose
+
+script:
+  - cargo build --verbose
+  - cargo test --verbose
+  - make wheel
+
+after_script:
+  - ls -la tmp/wheels
+
+
 notifications:
   email: false
-# script: make all
-# cargo build --verbose
-# cargo test --verbose

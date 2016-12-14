@@ -1,11 +1,11 @@
 [package]
-name = "parser"
+name = "rparser"
 version = "0.1.0"
 authors = ["Sergey Pashinin <sergey@pashinin.com>"]
 
 
 [lib]
-name = "parser"
+name = "rparser"
 crate-type = ["dylib"]
 # dylib, rlib, staticlib
 

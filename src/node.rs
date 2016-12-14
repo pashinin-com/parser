@@ -11,13 +11,19 @@ use std::fmt::{Debug, Display, Formatter};
 use std::cmp::PartialEq;
 use std::collections::HashMap;
 use std::borrow::Cow;
+// use parser::url_query;
+use nom::{IResult};
+use parser::{url_query};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum NodeClass{
     Root,
     Paragraph,
+    Header,
+    Code,
     URL,
     Text,
+    Comment,
 }
 
 #[derive(PartialEq,Eq,Debug)]
@@ -88,6 +94,46 @@ impl<'a> Node<'a>{
     }
 
 
+    /// Comment node
+    pub fn new_comment(txt: &'a str) -> Node<'a>
+    {
+        let mut x = HashMap::new();
+        x.insert("txt", txt);
+        Node{
+            children: None,
+            params: Some(x),
+            class: NodeClass::Comment,
+        }
+    }
+
+
+    /// H2 header
+    pub fn new_h2(txt: &'a str) -> Node<'a>
+    {
+        let mut x = HashMap::new();
+        x.insert("txt", txt);
+        x.insert("tag", "h2");
+        Node{
+            children: None,
+            params: Some(x),
+            class: NodeClass::Header,
+        }
+    }
+
+    /// Code
+    pub fn new_code(txt: &'a str, lng: &'a str) -> Node<'a>
+    {
+        let mut x = HashMap::new();
+        x.insert("txt", txt);
+        x.insert("lng", lng);
+        Node{
+            children: None,
+            params: Some(x),
+            class: NodeClass::Code,
+        }
+    }
+
+
     /// Text node
     pub fn new_text(
         txt: &'a str,
@@ -147,6 +193,7 @@ impl<'a> Display for Node<'a> {
             NodeClass::URL => {
                 match self.params {
                     Some(ref x) => {
+                        let hostname = x.get("hostname").unwrap();
                         let url = format!(
                             "{}://{}{}{}",
                             x.get("proto").unwrap(),
@@ -154,10 +201,61 @@ impl<'a> Display for Node<'a> {
                             x.get("path").unwrap(),
                             x.get("query").unwrap(),
                         );
-                        write!(f, r#"<a href="{0}">{0}</a>"#, url)
+                        match hostname {
+                            &"www.youtube.com" => {
+                                let q = x.get("query").unwrap();
+                                let query_hm = url_query(q.as_bytes());
+                                match query_hm {
+                                    IResult::Done(_, query) => {
+                                        let video_code = query.get("v");
+                                        match video_code {
+                                            // <iframe width="560" height="315" src="https://www.youtube.com/embed/g6ez7sbaiWc" frameborder="0" allowfullscreen></iframe>
+                                            Some(code) => write!(f, r#"<iframe width="560" height="315" src="https://www.youtube.com/embed/{}" frameborder="0" allowfullscreen></iframe>"#, code),
+                                            // Some(code) => write!(f, "code: {}", code),
+                                            _ => write!(f, r#"<a href="{0}">{0}</a>"#, url)
+                                        }
+                                        // println!("i: {} | o: {:?}", i, o);
+                                        // return Ok(PyString::new(py, &o));
+                                        // write!(f, r#"get video"#)
+                                    },
+                                    // IResult::Incomplete(x) => println!("incomplete: {:?}", x),
+                                    // IResult::Error(e) => println!("error: {:?}", e)
+                                    _ => write!(f, r#"<a href="{0}">{0}</a>"#, url)
+                                }
+
+                                // write!(f, r#"<iframe width="560" height="315" src="https://www.youtube.com/embed/g6ez7sbaiWc" frameborder="0" allowfullscreen></iframe>"#)
+                            }
+                            _ => write!(f, r#"<a href="{0}">{0}</a>"#, url)
+                        }
+
                     }
                     _ => {write!(f, "")}
                 }
+            }
+
+            // Headers
+            NodeClass::Code => {
+                match self.params {
+                    Some(ref x) => {
+                        write!(f, "<pre>{}</pre>", x.get("txt").unwrap())
+                    }
+                    _ => {write!(f, "")}
+                }
+            }
+
+            // Headers
+            NodeClass::Header => {
+                match self.params {
+                    Some(ref x) => {
+                        write!(f, "<{0}>{1}</{0}>", x.get("tag").unwrap(), x.get("txt").unwrap())
+                    }
+                    _ => {write!(f, "")}
+                }
+            }
+
+            // Comment
+            NodeClass::Comment => {
+                write!(f, "")
             }
 
             // Text
