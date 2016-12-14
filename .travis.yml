@@ -13,9 +13,9 @@ python:
   - "pypy"
 
 matrix:
-  include:
-    - os: osx
-    - os: linux
+  # include:
+  #   - os: osx
+  #   - os: linux
 
   allow_failures:
     - rust: nightly
