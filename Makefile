@@ -19,7 +19,8 @@ test:
 
 wheel:
 	mkdir -p tmp/wheels
-	python -m pip wheel . -w tmp/wheels/
+	python3 -m pip wheel . -w tmp/wheels/
+# python -m pip wheel . -w tmp/wheels/
 
 install:
 	sudo python3 setup.py install

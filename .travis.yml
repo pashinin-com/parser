@@ -68,6 +68,10 @@ before_deploy:
 # The travis slug is stored in .git/config. You can change it there
 # instead of constantly using the -r option.
 #
+# You need to register your package first before deploying will work:
+#
+# python3 setup.py bdist_wheel
+# twine upload dist/rparser-0.1.1-cp35-cp35m-linux_x86_64.whl
 deploy:
   - provider: pypi
     user: pashinin
