@@ -54,6 +54,11 @@ after_script:
   - ls -la tmp/wheels
 
 
+
+before_deploy:
+  - sudo pip install twine
+
+
 # To use encrypted variables:
 #
 # sudo gem install travis
