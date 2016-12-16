@@ -59,7 +59,7 @@ script:
   # - ls wheelhouse/
 
 after_script:
-  - ls -la tmp/wheels
+  - ls -la dist
 
 
 
