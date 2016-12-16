@@ -12,6 +12,10 @@ python:
   # - "nightly" # currently points to 3.7-dev
   - "pypy"
 
+env:
+  global:
+    - DOCKER_IMAGE=quay.io/pypa/manylinux1_x86_64
+
 matrix:
   # include:
   #   - os: osx
@@ -35,6 +39,8 @@ addons:
 
 install:
   - pip install wheel
+  # - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then docker pull $DOCKER_IMAGE; fi
+
 # install:
 #   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then docker pull $DOCKER_IMAGE; fi
 
@@ -49,6 +55,8 @@ script:
   - cargo build --verbose
   - cargo test --verbose
   - python setup.py bdist_wheel
+  # - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then docker run --rm -v `pwd`:/io $DOCKER_IMAGE $PRE_CMD /io/build-wheels.sh $TRAVIS_OS_NAME; fi
+  # - ls wheelhouse/
 
 after_script:
   - ls -la tmp/wheels
