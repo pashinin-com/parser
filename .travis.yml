@@ -46,7 +46,7 @@ addons:
 
 install:
   - pip install wheel
-  - sudo install-rust.sh
+  - curl https://sh.rustup.rs -sSf | sh -s -- -y
   # - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then docker pull $DOCKER_IMAGE; fi
 
 #
