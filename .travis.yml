@@ -22,11 +22,14 @@ env:
 matrix:
   include:
     - os: osx
+      language: rust
       python: "3.5"
     - os: linux
+      language: rust
       python: "2.7"
       sudo: required
     - os: linux
+      language: rust
       python: "3.5"
       sudo: required
       # services:
