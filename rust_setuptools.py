@@ -72,11 +72,11 @@ class RustBuildCommand(Command):
             # Execute cargo.
             try:
                 toml = os.path.join(crate_path, 'Cargo.toml')
-                # cargo rustc --release -- -C prefer-dynamic
-                # args = ['cargo', 'build', '--manifest-path', toml]
-                args = ['cargo', 'rustc', '--release', '--', '-C', 'prefer-dynamic']
-                # if not self.debug:
-                #     args.append('--release')
+                args = ['cargo', 'build']
+                # args = ['cargo', 'rustc', '--release', '--', '-C', 'prefer-dynamic']
+                if not self.debug:
+                    args.append('--release')
+                args = args + ['--manifest-path', toml]
                 args.extend(list(self.extra_cargo_args or []))
                 if not self.quiet:
                     print(' '.join(args), file=sys.stderr)
