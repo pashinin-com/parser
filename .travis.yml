@@ -66,7 +66,7 @@ before_install:
 install:
   - pip install wheel
   - curl -sL https://static.rust-lang.org/rustup.sh -o ~/rustup.sh
-  - sh ~/rustup.sh --prefix=~/rust --spec=stable -y 2> /dev/null
+  - sh ~/rustup.sh --prefix=/usr/local --spec=stable -y 2> /dev/null
   - ls -la ~/rust
   - ls -la /usr/local/bin
   # - curl -sL https://static.rust-lang.org/rustup.sh -o ~/rust-installer/rustup.sh
