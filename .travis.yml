@@ -89,7 +89,9 @@ script:
 
 after_script:
   - ls -la dist
-
+  - mmv "dist/rparser-*-*-*-*_*.whl" "dist/rparser-#1-#2-#3-manylinux1_#5.whl"
+  # - mmv "dist/rparser-*-cp*-cp*-manylinux1_*.whl" "/io/wheelhouse/rust_fst-#1-py2.py3-none-manylinux1_#4.whl"
+  # rparser-0.1.6-cp35-cp35m-linux_x86_64.whl
 
 
 before_deploy:
