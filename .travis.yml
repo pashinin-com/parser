@@ -36,8 +36,9 @@ matrix:
       #   - docker
       # env: DOCKER_IMAGE=quay.io/pypa/manylinux1_x86_64
 
-  # allow_failures:
-  #   - rust: nightly
+  allow_failures:
+    - os: osx
+    #   - rust: nightly
 
 
 addons:
@@ -48,13 +49,13 @@ addons:
       - build-essential
       - libc6
       - mmv
-      # - python3.5
+      - python3.5
       # - python3.5-dev
 
 
 install:
   - pip install wheel
-  - curl https://sh.rustup.rs -sSf | sh -s -- -y
+  # - curl https://sh.rustup.rs -sSf | sh -s -- -y
   # - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then docker pull $DOCKER_IMAGE; fi
 
 #
