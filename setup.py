@@ -28,6 +28,7 @@ setup(
     },
 
     zip_safe=False,
+    skip_upload_docs=True,
 
     # https://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=(

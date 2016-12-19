@@ -1,6 +1,6 @@
 [package]
 name = "rparser"
-version = "0.1.0"
+version = "0.1.12"
 authors = ["Sergey Pashinin <sergey@pashinin.com>"]
 
 
