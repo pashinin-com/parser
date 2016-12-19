@@ -88,6 +88,10 @@ script:
   # - mmv "dist/rparser-*-cp*-cp*-manylinux1_*.whl" "/io/wheelhouse/rust_fst-#1-py2.py3-none-manylinux1_#4.whl"
 # https://www.python.org/dev/peps/pep-0427/#file-name-convention
 
+# Rename wheel to accept in pypi. Pypi does not accept "linux_x86-64"
+#
+# Example (Django): Django-1.10.4-py2.py3-none-any.whl
+# Only py3: Name-1.10.4-py3-none-any.whl
 before_deploy:
   - sudo pip install twine
   - ls -la dist
