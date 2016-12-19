@@ -65,8 +65,10 @@ before_install:
 
 install:
   - pip install wheel
-  - curl -sL https://static.rust-lang.org/rustup.sh -o ~/rust-installer/rustup.sh
-  - sh ~/rust-installer/rustup.sh --prefix=~/rust --spec=stable -y --disable-sudo 2> /dev/null
+  - curl -sL https://static.rust-lang.org/rustup.sh -o ~/rustup.sh
+  - sh ~/rustup.sh --prefix=~/rust --spec=stable -y --disable-sudo 2> /dev/null
+  # - curl -sL https://static.rust-lang.org/rustup.sh -o ~/rust-installer/rustup.sh
+  # - sh ~/rust-installer/rustup.sh --prefix=~/rust --spec=stable -y --disable-sudo 2> /dev/null
   # - curl https://sh.rustup.rs -sSf | sh -s -- -y
   # - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then docker pull $DOCKER_IMAGE; fi
 
