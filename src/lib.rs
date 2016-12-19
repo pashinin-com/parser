@@ -13,8 +13,6 @@ extern crate cpython;
 #[macro_use]
 extern crate nom;
 // use nom::{IResult, space, alpha, alphanumeric, digit};
-// use nom::{IResult};
-// use nom::IResult::*;
 use cpython::ToPyObject;
 
 pub use self::parser::*;

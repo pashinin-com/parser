@@ -14,4 +14,12 @@ crate-type = ["dylib"]
 # interpolate_idents = "0.0.9"
 nom = "^2.0"
 # itertools = "*"
-cpython = { git = "https://github.com/dgrunwald/rust-cpython.git" }
+# cpython = { git = "https://github.com/dgrunwald/rust-cpython.git" }
+# cpython = "0.1"
+
+
+[dependencies.cpython]
+version = "0.1"
+default-features = false
+# features = ["python27-sys"]
+features = ["python3-sys"]

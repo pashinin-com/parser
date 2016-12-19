@@ -24,16 +24,13 @@ matrix:
     - os: osx
       language: python
       python: "3.5"
-      # env: PYTHON=3.5
-    - os: linux
-      language: python
-      python: "2.7"
-      # env: PYTHON=2.7
-      sudo: required
+    # - os: linux
+    #   language: python
+    #   python: "2.7"
+    #   sudo: required
     - os: linux
       language: python
       python: "3.5"
-      # env: PYTHON=3.5
       sudo: required
       # services:
       #   - docker
