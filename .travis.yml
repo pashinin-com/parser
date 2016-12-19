@@ -52,6 +52,10 @@ addons:
       - python3.5
       # - python3.5-dev
 
+before_install:
+  - which python
+  - python -V
+  - python3 -V
 
 install:
   - pip install wheel
