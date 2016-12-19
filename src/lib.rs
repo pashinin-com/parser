@@ -99,6 +99,12 @@ fn html(py: Python, input_str: PyString) -> PyResult<PyString> {
     }
 }
 
+/// Docs about this macros:
+/// http://dgrunwald.github.io/rust-cpython/doc/cpython/macro.py_module_initializer.html
+///
+/// 1. name: The module name as a Rust identifier.
+/// 2. py2_init: "init" + $name. Necessary because macros can't use concat_idents!().
+/// 3. py3_init: "PyInit_" + $name. Necessary because macros can't use concat_idents!().
 py_module_initializer!(librparser, initlibrparser, PyInit_librparser, |py, m| {
     // try!(module.add(py, "add_two", py_fn!(add_two)));
     try!(m.add(py, "__doc__", "Module documentation string"));
