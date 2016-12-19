@@ -95,7 +95,7 @@ script:
 before_deploy:
   - sudo pip install twine
   - ls -la dist
-  - mmv "dist/rparser-*-*-*-*_*.whl" "dist/rparser-#1-#2-#3-none-any.whl"
+  - mmv "dist/rparser-*-*-*-*_*.whl" "dist/rparser-#1-#2-#3-any.whl"
   - ls -la dist
 
 
