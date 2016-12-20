@@ -81,3 +81,9 @@ Apply certain traits:
 ```
 
 ### Cow - copy on write
+
+## Build
+
+After `python setup.py build_rust` ready pkg is in build/lib.linux-x86_64-2.7/
+After `python3 setup.py build_rust`  ready pkg is in build/lib/
+ln -sf /var/www/parser/build/lib/rparser /usr/local/lib/python3.5/rparser

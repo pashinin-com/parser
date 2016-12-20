@@ -12,14 +12,11 @@ extern crate cpython;
 
 #[macro_use]
 extern crate nom;
-// use nom::{IResult, space, alpha, alphanumeric, digit};
 use cpython::ToPyObject;
-
 pub use self::parser::*;
 pub mod parser;
 pub use self::generator::*;
 pub mod generator;
-
 mod paragraph;
 mod article;
 mod node;
