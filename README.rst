@@ -1,22 +1,22 @@
-# Parser
+Parser
+======
 
-[![Build Status](https://travis-ci.org/pashinin-com/parser.png?branch=master)](https://travis-ci.org/pashinin-com/parser)
+.. image:: https://travis-ci.org/pashinin-com/parser.png?branch=master
+    :target: https://travis-ci.org/pashinin-com/rparser
 
-## Install
+This is a Python 3.5 module (.so file). The main file is lib.rs where we
+define `PyInit_` function.
+
+Install
+-------
 
 ```bash
-curl -sSf https://static.rust-lang.org/rustup.sh | sh
-sudo -H -u www-data mkdir -p /var/www/parser
-sudo -H -u www-data git clone https://github.com/pashinin-com/parser.git /var/www/parser/initial
-cd /var/www/parser/initial
-sudo -H -u www-data make rd
-ln -s /var/www/parser/initial/target/release/libparser.so /var/www/pashinin.com/initial/tmp/ve/lib/python3.5/
+pip install rparser
 ```
 
 ## Description
 
-This is a Python 3.5 module (.so file). The main file is lib.rs where we
-define `PyInit_` function.
+
 
 ## Libraries used
 
