@@ -1,3 +1,4 @@
+from __future__ import print_function
 
 __title__ = 'rparser'
 __version__ = '0.1.13'
@@ -7,4 +8,7 @@ __license__ = 'GPL 3.0'
 __copyright__ = 'Copyright 2016 Sergey Pashinin'
 
 
-from .librparser import *  # noqa
+try:
+    from .librparser import *  # noqa
+except:
+    print("Error importing rparser library")

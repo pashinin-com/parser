@@ -3,14 +3,19 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to rparser's documentation!
-===================================
+rparser - Python parsers (in Rust)
+==================================
+
+.. code-block:: bash
+
+   pip install rparser
 
 Contents:
 
 .. toctree::
    :maxdepth: 2
 
+   rust-notes
 
 
 Indices and tables
@@ -19,4 +24,3 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
-
