@@ -19,6 +19,8 @@ use parser::{url_query};
 pub enum NodeClass{
     Root,
     Paragraph,
+    ListUnnumbered,
+    ListUnnumberedItem,
     Header,
     Code,
     URL,
@@ -103,6 +105,27 @@ impl<'a> Node<'a>{
             children: None,
             params: Some(x),
             class: NodeClass::Comment,
+        }
+    }
+
+
+    /// List
+    pub fn new_list_unnumbered_item(txt: &'a str) -> Node<'a>
+    {
+        let mut x = HashMap::new();
+        x.insert("txt", txt);
+        Node{
+            children: None,
+            params: Some(x),
+            class: NodeClass::ListUnnumberedItem,
+        }
+    }
+    pub fn new_list_unnumbered(items: Vec<Node<'a> >) -> Node<'a>
+    {
+        Node{
+            children: Some(items),
+            params: None,
+            class: NodeClass::ListUnnumbered,
         }
     }
 
@@ -233,7 +256,7 @@ impl<'a> Display for Node<'a> {
                 }
             }
 
-            // Headers
+            // Code
             NodeClass::Code => {
                 match self.params {
                     Some(ref x) => {
@@ -256,6 +279,33 @@ impl<'a> Display for Node<'a> {
             // Comment
             NodeClass::Comment => {
                 write!(f, "")
+            }
+
+            // new_list_unnumbered
+            NodeClass::ListUnnumbered => {
+                // write!(f, "LIST ")
+                match self.children {
+                    Some(ref children) => {
+                        let children_strings: Vec<String> = children.iter()
+                            .map(|&ref x| x.to_string())
+                            .collect();
+                        let s = children_strings.join("");
+                        write!(f, "<ul>{}</ul>", s)
+                    }
+                    _ => {
+                        write!(f, "<ul></ul>")
+                    }
+                }
+            }
+            // new_list_unnumbered
+            NodeClass::ListUnnumberedItem => {
+                // write!(f, "LISTITEM ")
+                match self.params {
+                    Some(ref x) => {
+                        write!(f, "<li>{0}</li>", x.get("txt").unwrap())
+                    }
+                    _ => {write!(f, "")}
+                }
             }
 
             // Text

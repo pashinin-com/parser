@@ -26,12 +26,6 @@ use self::article::*;
 // PyTuple, PyDict, ToPyObject, PythonObject
 use cpython::{PyObject, PyResult, Python, PyString, PyTuple};
 
-fn run(py: Python) -> PyResult<PyObject> {
-    println!("Rust says: Hello Python!");
-    Ok(py.None())
-}
-
-
 fn ast(py: Python, input_str: PyString) -> PyResult<PyString> {
     // println!("Rust says: {}", s.to_string(py));
     // let res = parse(&input);
@@ -103,7 +97,6 @@ fn html(py: Python, input_str: PyString) -> PyResult<PyString> {
 py_module_initializer!(librparser, initlibrparser, PyInit_librparser, |py, m| {
     // try!(module.add(py, "add_two", py_fn!(add_two)));
     try!(m.add(py, "__doc__", "Module documentation string"));
-    try!(m.add(py, "run", py_fn!(py, run())));
     try!(m.add(py, "ast", py_fn!(py, ast(input: PyString))));
     try!(m.add(py, "html", py_fn!(py, html(input: PyString))));
     Ok(())

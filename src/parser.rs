@@ -80,6 +80,35 @@ named!(comment<Node>,
 );
 
 
+/// List unnumbered
+///
+/// * item1
+named!(list_unnumbered_item<Node>,
+       do_parse!(
+           opt!(eol) >>
+               char!( '*' ) >>
+               opt!(take_while!(space_but_not_eol)) >>
+               txt: map_res!(is_not!( "\r\n" ), from_utf8) >>
+               opt!(take_while!(space_but_not_eol)) >>
+               // opt!(eol) >>
+               (Node::new_list_unnumbered_item(txt))
+       )
+);
+
+/// List
+///
+/// * item1
+/// * item2
+named!(list_unnumbered<Node>,
+       do_parse!(
+           // items: separated_list!(eol, list_unnumbered_item) >>
+           items: many1!(list_unnumbered_item) >>
+           (Node::new_list_unnumbered(items))
+           //(items)     // Vec<&str>
+       )
+);
+
+
 /// Header 2
 named!(h2<Node>,
        do_parse!(
@@ -299,11 +328,23 @@ named!(url<Node>,
 // named!(parse<&[u8], Paragraph>,
 
 
+named!(root_element<Node>,
+       do_parse!(
+           block: alt_complete!(
+               list_unnumbered |
+               paragraph
+               // list_unnumbered
+           ) >>
+               (block)
+       )
+);
+
+
 /// Main parser function
 named!(pub parse<Node>,
        do_parse!(
            opt!(take_while!(any_space)) >>
-               pars: separated_list!(paragraph_separator, paragraph) >>
+               pars: separated_list!(paragraph_separator, root_element) >>
                opt!(take_while!(any_space)) >>
            // (pars)
                (Node::new_root(pars))
@@ -341,6 +382,7 @@ named!(word<Node>,
                h2 |
                url |
                comment |
+               list_unnumbered |
                symbols
            ) >>
                (block)
@@ -378,6 +420,59 @@ named!(paragraph<Node>,
 //
 // Tests
 //
+
+
+#[test]
+fn test_list_unnumbered_item() {
+    let mut tests = HashMap::new();
+    let mut x = HashMap::new();
+    x.insert("txt", "asd");
+    tests.insert(
+        &b"* asd"[..],
+        Done(&b""[..], Node{
+            children: None,
+            params: Some(x),
+            class: NodeClass::ListUnnumberedItem,
+        })
+    );
+    for (input, expected) in &tests {
+        assert_eq!(list_unnumbered_item(input), *expected);
+    }
+}
+
+#[test]
+fn test_list_unnumbered() {
+    let mut tests = HashMap::new();
+    let mut x = HashMap::new();
+    x.insert("txt", "asd");
+    let mut x2 = HashMap::new();
+    x2.insert("txt", "123");
+    tests.insert(
+        &b"*asd\n*123"[..],
+        Done(&b""[..], Node{
+            children: Some(vec![
+                Node{
+                    children: None,
+                    class: NodeClass::ListUnnumberedItem,
+                    params: Some(x),
+                },
+                Node{
+                    children: None,
+                    class: NodeClass::ListUnnumberedItem,
+                    params: Some(x2),
+                }
+            ]),
+            params: None,
+            class: NodeClass::ListUnnumbered,
+        })
+
+    );
+    for (input, expected) in &tests {
+        assert_eq!(list_unnumbered(input), *expected);
+    }
+}
+
+
 
 #[test]
 fn test_hostname() {
@@ -555,19 +650,27 @@ fn test_url_query() {
 #[test]
 fn test_parse() {
     let mut tests = HashMap::new();
-    tests.insert(
-        // &b"qwerty\n\nhttps://host.pashinin.com\n\n"[..],
-        &b" 123 \n\n asd "[..],
-        "<p>123</p><p>asd</p>",
-    );
+    tests.insert(&b"* 123 \n* asd "[..], "<ul><li>123 </li><li>asd </li></ul>");
+    // tests.insert(
+    //     // &b"qwerty\n\nhttps://host.pashinin.com\n\n"[..],
+    //     // &b" 123 \n\n asd "[..],
+    //     // "<p>123</p><p>asd</p>",
+
+    //     &b"* 123 \n* asd "[..],
+    //     // Done(&b""[..], Node{
+    //     //     children: None,
+    //     //     params: None,
+    //     //     class: NodeClass::ListUnnumberedItem,
+    //     // })
+    //     "* 123 \n* asd ",
+    // );
+    tests.insert(&b" 123 \n\n asd "[..], "<p>123</p><p>asd</p>",);
+    // for (input, expected) in &tests {assert_eq!(parse(input), *expected);}
+
     for (input, expected) in &tests {
         let r = match parse(input) {
-            Done(_, node) => {
-                // println!("i: {} | o: {:?}", i, o);
-                // return Ok(PyString::new(py, &o));
-                node.to_string()
-            },
-            _ => "".to_string()
+            Done(_, node) => {node.to_string()},
+            _ => "error".to_string()
         };
         assert_eq!(r, *expected);
     }
