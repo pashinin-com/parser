@@ -1,24 +1,13 @@
-// use nom::{IResult, space, alpha, alphanumeric, digit};
-use nom::{IResult, eol, anychar, is_space, alpha};
+//! Some parser functions
 
-// PyTuple, PyDict, ToPyObject, PythonObject
-// use cpython::{PyObject, PyResult, Python, PyString, PyTuple};
-// use std::string::String;
-use generator::{URL};
-use node::{Node, NodeClass};
-use paragraph::{Paragraph};
-// use generator::{ToHtml, Command, ParagraphElement, Node};
-use std::collections::HashMap;
-use nom::IResult::{Done, Incomplete, Error};
-use std::str;
+use nom::{eol};
+use node::{Node};
 use std::str::from_utf8;
-// use nom::{alpha, alphanumeric};
-use nom::{ErrorKind, Needed};
-// use nom::Err::Position;
+use common::*;
 
-fn not_eol(chr:u8) -> bool {
-    chr != '\r' as u8 && chr == '\n' as u8
-}
+// fn not_eol(chr:u8) -> bool {
+//     chr != '\r' as u8 && chr == '\n' as u8
+// }
 fn space_but_not_eol(chr:u8) -> bool {
     chr == ' ' as u8 || chr == '\t' as u8
 }
@@ -48,10 +37,10 @@ fn not_space(chr:u8) -> bool {!any_space(chr)}
 // }
 
 
-named!(get_any_space, take_while!(any_space));
+// named!(get_any_space, take_while!(any_space));
 
 
-named!(paragraph_separator,
+named!(pub paragraph_separator,
        complete!(
            recognize!(
                chain!(
@@ -83,7 +72,7 @@ named!(comment<Node>,
 /// List unnumbered
 ///
 /// * item1
-named!(list_unnumbered_item<Node>,
+named!(pub list_unnumbered_item<Node>,
        do_parse!(
            opt!(eol) >>
                char!( '*' ) >>
@@ -99,7 +88,7 @@ named!(list_unnumbered_item<Node>,
 ///
 /// * item1
 /// * item2
-named!(list_unnumbered<Node>,
+named!(pub list_unnumbered<Node>,
        do_parse!(
            // items: separated_list!(eol, list_unnumbered_item) >>
            items: many1!(list_unnumbered_item) >>
@@ -141,59 +130,6 @@ named!(h2<Node>,
 //     c == '.'
 // }
 
-/// Protocol (http, https, ftp, ...)
-named!(url_proto,
-       alt_complete!(
-           tag!("https") |
-           tag!("http")  |
-           tag!("ftp")
-       )
-);
-
-
-/// Domain name
-///
-/// example.org
-// named!(domain_name <&str, &str>,
-named!(domain_name,
-       recognize!(
-           chain!(
-               is_not!( "./ \r\n\t" ) ~
-                   tag!(".")    ~
-                   is_not!( "./ \r\n\t" ),
-               || {}
-           )
-       )
-);
-
-/// Url query part:
-///
-/// Examples:
-///
-/// key=value
-/// key
-///
-/// Value can contain "=". Value ends on space or "&" sign
-named!(url_query_params1<(&str, &str)>,
-       alt_complete!(
-           // key=value
-           // complete!(
-           do_parse!(
-               key: map_res!(is_not!( " \r\n\t=" ), from_utf8) >>
-                   tag!("=") >>
-                   val: map_res!(is_not!( " \r\n\t&" ), from_utf8) >>
-                   (key, val)
-           )
-       // )
-               |
-           // // key
-           // complete!(
-           do_parse!(
-               key: map_res!(is_not!( " \r\n\t=" ), from_utf8) >>
-                   (key, "")
-           )
-       )
-);
 
 
 named!(code<Node>,
@@ -212,93 +148,9 @@ named!(code<Node>,
 );
 
 
-/// Url query params without first "?" sign
-///
-/// Returns: Vec<tuple>
-///
-/// Example input:
-///
-/// gfe_rd=cr&ei=zCZLWNPMHceAuAH2-oCYDw&gws_rd=ssl#newwindow=1&q=url+query+string
-///
-// HashMap<&'a str, &'a str>
-named!(url_query_params<Vec<(&str, &str)> >,
-// named!(url_query_params<HashMap<&str, &str> >,
-       do_parse!(
-           params: separated_list!(char!('&'), url_query_params1) >>
-           (params)
-               // (params.iter().fold(
-               //         HashMap::new(),
-               //         |mut T, tuple| {T.insert(tuple.0, tuple.1); T})
-               // )
-       )
-);
-
-
-named!(pub url_query<HashMap<&str, &str> >,
-       complete!(
-           do_parse!(
-               tag!("?") >>
-                   params: separated_list!(tag!("&"), url_query_params1) >>
-               // (params)
-                   (params.iter().fold(
-                       HashMap::new(),
-                       |mut T, tuple| {T.insert(tuple.0, tuple.1); T})
-                   )
-           )
-       )
-);
-
-
-#[test]
-fn test_domain() {
-    let mut tests = HashMap::new();
-    tests.insert("pashinin.com", "pashinin.com");
-    tests.insert("тест.рф", "тест.рф");
-    // .as_bytes()
-    for (input, expected) in &tests {
-        // let i = input.as_bytes();
-        match domain_name(input.as_bytes()) {
-            Done(_, output) => {
-                // assert_eq!(from_utf8(&output).unwrap(), from_utf8(expected).unwrap());
-                assert_eq!(&from_utf8(&output).unwrap(), expected);
-            },
-            Incomplete(x) => panic!("incomplete: {:?}", x),
-            Error(e) => panic!("error: {:?}", e),
-        }
-    }
-}
-
-/// Host name
-///
-/// host1.example.org
-/// sub.host1.example.org
-named!(hostname,
-       recognize!(
-           chain!(
-               // many1!(
-               // not!(char!('.'))
-               // is_not_s!( "./ \r\n\t" ) ~
-               // recognize!(
-               is_not!(". /\r\n\t") ~
-                   many1!(
-                       recognize!(
-                       chain!(
-                           tag!(".") ~
-                               is_not!(". /\r\n\t"),
-                           || {}
-                       )
-                       )
-                   )
-                   // domain_name
-                   ,
-               || {}
-           )
-       )
-);
-
 
 /// URL parser
-named!(url<Node>,
+named!(pub url<Node>,
     do_parse!(
         proto: map_res!(url_proto, from_utf8)  >>
             tag!("://")   >>
@@ -358,21 +210,21 @@ named!(symbols<Node>,
        )
 );
 
-named!(tag,
-       // delimited!(char!('<'), alpha, char!('>'))
-       recognize!(
-       do_parse!(
-           char!('<') >>
-               opt!(take_while!(any_space)) >>
-               name: map_res!(take_while!(not_space), from_utf8) >>
-               params: map_res!(is_not!( ">" ), from_utf8) >>
-               opt!(char!('/')) >>
-               char!('>') >>
-               ()
-       ))
-);
+// named!(tag,
+//        // delimited!(char!('<'), alpha, char!('>'))
+//        recognize!(
+//        do_parse!(
+//            char!('<') >>
+//                opt!(take_while!(any_space)) >>
+//                name: map_res!(take_while!(not_space), from_utf8) >>
+//                params: map_res!(is_not!( ">" ), from_utf8) >>
+//                opt!(char!('/')) >>
+//                char!('>') >>
+//                ()
+//        ))
+// );
 
-named!(closing_tag, delimited!(tag!("</"), alpha, char!('>')));
+// named!(closing_tag, delimited!(tag!("</"), alpha, char!('>')));
 
 /// Anything between spaces in 1 paragraph
 named!(word<Node>,
@@ -390,7 +242,7 @@ named!(word<Node>,
 );
 
 
-named!(word_separator,
+named!(pub word_separator,
        recognize!(
            complete!(
                do_parse!(
@@ -404,7 +256,7 @@ named!(word_separator,
 );
 
 
-named!(paragraph<Node>,
+named!(pub paragraph<Node>,
        do_parse!(
            words: separated_list!(word_separator, word) >>
            // nl: opt!(paragraph_separator) >>
@@ -420,258 +272,278 @@ named!(paragraph<Node>,
 //
 // Tests
 //
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use nom::IResult::{Done, Incomplete, Error};
+    use std::collections::HashMap;
+    use node::{Node, NodeClass};
+    use std::str::from_utf8;
+    use common::*;
+    // use std::str::from_utf8;
 
-
-#[test]
-fn test_list_unnumbered_item() {
-    let mut tests = HashMap::new();
-    let mut x = HashMap::new();
-    x.insert("txt", "asd");
-    tests.insert(
-        &b"* asd"[..],
-        Done(&b""[..], Node{
-            children: None,
-            params: Some(x),
-            class: NodeClass::ListUnnumberedItem,
-        })
-    );
-    for (input, expected) in &tests {
-        assert_eq!(list_unnumbered_item(input), *expected);
-    }
-}
-
-#[test]
-fn test_list_unnumbered() {
-    let mut tests = HashMap::new();
-    let mut x = HashMap::new();
-    x.insert("txt", "asd");
-    let mut x2 = HashMap::new();
-    x2.insert("txt", "123");
-    tests.insert(
-        &b"*asd\n*123"[..],
-        Done(&b""[..], Node{
-            children: Some(vec![
-                Node{
-                    children: None,
-                    class: NodeClass::ListUnnumberedItem,
-                    params: Some(x),
+    #[test]
+    fn test_domain() {
+        let mut tests = HashMap::new();
+        tests.insert("pashinin.com", "pashinin.com");
+        tests.insert("тест.рф", "тест.рф");
+        // .as_bytes()
+        for (input, expected) in &tests {
+            // let i = input.as_bytes();
+            match domain_name(input.as_bytes()) {
+                Done(_, output) => {
+                    // assert_eq!(from_utf8(&output).unwrap(), from_utf8(expected).unwrap());
+                    assert_eq!(&from_utf8(&output).unwrap(), expected);
                 },
-                Node{
-                    children: None,
-                    class: NodeClass::ListUnnumberedItem,
-                    params: Some(x2),
-                }
-            ]),
-            params: None,
-            class: NodeClass::ListUnnumbered,
-        })
-
-    );
-    for (input, expected) in &tests {
-        assert_eq!(list_unnumbered(input), *expected);
+                Incomplete(x) => panic!("incomplete: {:?}", x),
+                Error(e) => panic!("error: {:?}", e),
+            }
+        }
     }
-}
 
-
-
-#[test]
-fn test_hostname() {
-    let mut tests = HashMap::new();
-    tests.insert(
-        &b"host.pashinin.com"[..],
-        Done(&b""[..], "host.pashinin.com".as_bytes())
-    );
-    tests.insert(
-        &b"sub.www.youtube.com"[..],
-        Done(&b""[..], "sub.www.youtube.com".as_bytes())
-    );
-    // tests.insert(
-    //     &b"host .pashinin.com"[..],
-    //     Error(Position(ErrorKind::Many1, &b" .pashinin.com"[..]))
-    // );
-    for (input, expected) in &tests {
-        assert_eq!(hostname(input), *expected);
-    }
-}
-
-#[test]
-fn test_url() {
-    let mut tests = HashMap::new();
-    let mut x = HashMap::new();
-    x.insert("proto", "https");
-    x.insert("hostname", "www.youtube.com");
-    x.insert("path", "/watch");
-    x.insert("query", "?v=g6ez7sbaiWc");
-    tests.insert(
-        &b"https://www.youtube.com/watch?v=g6ez7sbaiWc"[..],
-        // Done(&b""[..], URL{proto:"https", hostname:"host.pashinin.com", path:"",
-        //                    query:None})
-        Done(&b""[..], Node{
-            class: NodeClass::URL,
-            children: None,
-            params: Some(x),
-        })
-    );
-    // tests.insert(
-    //     &b"ftp://pashinin.com"[..],
-    //     Done(&b""[..], URL{proto:"ftp", hostname:"pashinin.com", path:"",
-    //                        query:None})
-    // );
-    // tests.insert(
-    //     &b"https://www.youtube.com/watch?v=g6ez7sbaiWc"[..],
-    //     Done(&b""[..], URL{proto:"https", hostname:"www.youtube.com", path:"/watch",
-    //                        query: Some("?v=g6ez7sbaiWc")})
-    // );
-
-    for (input, expected) in &tests {assert_eq!(url(input), *expected);}
-}
-
-
-#[test]
-fn test_paragraph() {
-    let mut tests = HashMap::new();
-    let mut x = HashMap::new();
-    x.insert("proto", "https");
-    x.insert("hostname", "host.pashinin.com");
-    x.insert("path", "");
-    x.insert("query", "");
-    tests.insert(
-        &b"https://host.pashinin.com"[..],
-        Done(&b""[..], Node{
-            children: Some(vec![
-                Node{
-                    children: None,
-                    class: NodeClass::URL,
-                    params: Some(x),
-                }
-            ]),
-            class: NodeClass::Paragraph,
-            params: None,
-        })
-    );
-
-    // for (input, expected) in &tests {assert_eq!((input), *expected);}
-    for (input, expected) in &tests {
-        let res = paragraph(input);
-        // let (x1, x2) = res.unwrap();
-        assert_eq!(
-            res,
-            *expected
+    #[test]
+    fn test_list_unnumbered_item() {
+        let mut tests = HashMap::new();
+        let mut x = HashMap::new();
+        x.insert("txt", "asd");
+        tests.insert(
+            &b"* asd"[..],
+            Done(&b""[..], Node{
+                children: None,
+                params: Some(x),
+                class: NodeClass::ListUnnumberedItem,
+            })
         );
+        for (input, expected) in &tests {
+            assert_eq!(list_unnumbered_item(input), *expected);
+        }
     }
-}
 
-#[test]
-fn test_tags() {
-    // let mut tests = HashMap::new();
-    // tests.insert(&b"<img>"[..], Done(&b""[..], &b"img"[..]));
-    // tests.insert(&b"\r\n\r\n"[..], Done(&b""[..], &b"\r\n\r\n"[..]));
-    // tests.insert(&b"\r\n"[..], Done(&b""[..], &b"\r\n\r\n"[..]));
-    // for (input, expected) in &tests {assert_eq!(tag(input), *expected);}
-}
+    #[test]
+    fn test_list_unnumbered() {
+        let mut tests = HashMap::new();
+        let mut x = HashMap::new();
+        x.insert("txt", "asd");
+        let mut x2 = HashMap::new();
+        x2.insert("txt", "123");
+        tests.insert(
+            &b"*asd\n*123"[..],
+            Done(&b""[..], Node{
+                children: Some(vec![
+                    Node{
+                        children: None,
+                        class: NodeClass::ListUnnumberedItem,
+                        params: Some(x),
+                    },
+                    Node{
+                        children: None,
+                        class: NodeClass::ListUnnumberedItem,
+                        params: Some(x2),
+                    }
+                ]),
+                params: None,
+                class: NodeClass::ListUnnumbered,
+            })
 
-#[test]
-fn test_par_separator() {
-    let mut tests = HashMap::new();
-    tests.insert(&b"\n\n"[..], Done(&b""[..], &b"\n\n"[..]));
-    tests.insert(&b"\r\n \r\n"[..], Done(&b""[..], &b"\r\n \r\n"[..]));
-    tests.insert(&b"\r\n\r\n"[..], Done(&b""[..], &b"\r\n\r\n"[..]));
-    // tests.insert(&b"\r\n"[..], Done(&b""[..], &b"\r\n\r\n"[..]));
-    for (input, expected) in &tests {assert_eq!(paragraph_separator(input), *expected);}
-}
+        );
+        for (input, expected) in &tests {
+            assert_eq!(list_unnumbered(input), *expected);
+        }
+    }
 
-#[test]
-fn test_word_separator() {
-    let mut tests = HashMap::new();
-    // tests.insert(&b"\n\n"[..], Error(error_position!(ErrorKind::ManyTill, &b"\n"[..])));
-    tests.insert(&b"\n\n"[..], Done(&b"\n"[..], &b"\n"[..]));
-    tests.insert(&b"     \n "[..], Done(&b""[..], &b"     \n "[..]));
-    // assert_eq!(multi(&c[..]), Error(error_position!(ErrorKind::ManyTill,&c[..])));
-    // for (input, expected) in &tests {assert_eq!(word_separator(input), *expected);}
-    for (input, expected) in &tests {assert_eq!(word_separator(input), *expected);}
-}
+    #[test]
+    fn test_hostname() {
+        let mut tests = HashMap::new();
+        tests.insert(
+            &b"host.pashinin.com"[..],
+            Done(&b""[..], "host.pashinin.com".as_bytes())
+        );
+        tests.insert(
+            &b"sub.www.youtube.com"[..],
+            Done(&b""[..], "sub.www.youtube.com".as_bytes())
+        );
+        // tests.insert(
+        //     &b"host .pashinin.com"[..],
+        //     Error(Position(ErrorKind::Many1, &b" .pashinin.com"[..]))
+        // );
+        for (input, expected) in &tests {
+            assert_eq!(hostname(input), *expected);
+        }
+    }
+
+    #[test]
+    fn test_url() {
+        let mut tests = HashMap::new();
+        let mut x = HashMap::new();
+        x.insert("proto", "https");
+        x.insert("hostname", "www.youtube.com");
+        x.insert("path", "/watch");
+        x.insert("query", "?v=g6ez7sbaiWc");
+        tests.insert(
+            &b"https://www.youtube.com/watch?v=g6ez7sbaiWc"[..],
+            // Done(&b""[..], URL{proto:"https", hostname:"host.pashinin.com", path:"",
+            //                    query:None})
+            Done(&b""[..], Node{
+                class: NodeClass::URL,
+                children: None,
+                params: Some(x),
+            })
+        );
+        // tests.insert(
+        //     &b"ftp://pashinin.com"[..],
+        //     Done(&b""[..], URL{proto:"ftp", hostname:"pashinin.com", path:"",
+        //                        query:None})
+        // );
+        // tests.insert(
+        //     &b"https://www.youtube.com/watch?v=g6ez7sbaiWc"[..],
+        //     Done(&b""[..], URL{proto:"https", hostname:"www.youtube.com", path:"/watch",
+        //                        query: Some("?v=g6ez7sbaiWc")})
+        // );
+
+        for (input, expected) in &tests {assert_eq!(url(input), *expected);}
+    }
+
+    #[test]
+    fn test_paragraph() {
+        let mut tests = HashMap::new();
+        let mut x = HashMap::new();
+        x.insert("proto", "https");
+        x.insert("hostname", "host.pashinin.com");
+        x.insert("path", "");
+        x.insert("query", "");
+        tests.insert(
+            &b"https://host.pashinin.com"[..],
+            Done(&b""[..], Node{
+                children: Some(vec![
+                    Node{
+                        children: None,
+                        class: NodeClass::URL,
+                        params: Some(x),
+                    }
+                ]),
+                class: NodeClass::Paragraph,
+                params: None,
+            })
+        );
+
+        // for (input, expected) in &tests {assert_eq!((input), *expected);}
+        for (input, expected) in &tests {
+            let res = paragraph(input);
+            // let (x1, x2) = res.unwrap();
+            assert_eq!(
+                res,
+                *expected
+            );
+        }
+    }
+
+    #[test]
+    fn test_tags() {
+        // let mut tests = HashMap::new();
+        // tests.insert(&b"<img>"[..], Done(&b""[..], &b"img"[..]));
+        // tests.insert(&b"\r\n\r\n"[..], Done(&b""[..], &b"\r\n\r\n"[..]));
+        // tests.insert(&b"\r\n"[..], Done(&b""[..], &b"\r\n\r\n"[..]));
+        // for (input, expected) in &tests {assert_eq!(tag(input), *expected);}
+    }
+
+    #[test]
+    fn test_par_separator() {
+        let mut tests = HashMap::new();
+        tests.insert(&b"\n\n"[..], Done(&b""[..], &b"\n\n"[..]));
+        tests.insert(&b"\r\n \r\n"[..], Done(&b""[..], &b"\r\n \r\n"[..]));
+        tests.insert(&b"\r\n\r\n"[..], Done(&b""[..], &b"\r\n\r\n"[..]));
+        // tests.insert(&b"\r\n"[..], Done(&b""[..], &b"\r\n\r\n"[..]));
+        for (input, expected) in &tests {assert_eq!(paragraph_separator(input), *expected);}
+    }
+
+    #[test]
+    fn test_word_separator() {
+        let mut tests = HashMap::new();
+        // tests.insert(&b"\n\n"[..], Error(error_position!(ErrorKind::ManyTill, &b"\n"[..])));
+        tests.insert(&b"\n\n"[..], Done(&b"\n"[..], &b"\n"[..]));
+        tests.insert(&b"     \n "[..], Done(&b""[..], &b"     \n "[..]));
+        // assert_eq!(multi(&c[..]), Error(error_position!(ErrorKind::ManyTill,&c[..])));
+        // for (input, expected) in &tests {assert_eq!(word_separator(input), *expected);}
+        for (input, expected) in &tests {assert_eq!(word_separator(input), *expected);}
+    }
+
+    #[test]
+    fn test_url_query_params() {
+        let mut tests = HashMap::new();
+        // key=value & key2=value2
+        tests.insert(
+            &b"gfe_rd=cr&ei=zCZLWNPMHceAuAH2-oCYDw&gws_rd=ssl#newwindow=1&q=url+query+string"[..],
+            Done(&b""[..], vec![
+                ("gfe_rd", "cr"),
+                ("ei", "zCZLWNPMHceAuAH2-oCYDw"),
+                ("gws_rd", "ssl#newwindow=1"),
+                ("q", "url+query+string"),
+            ])
+        );
+
+        // test a key without a value:  /path?param
+        // param   -  ("param", "")
+        // tests.insert(
+        //     &b"key"[..],
+        //     Done(&b""[..], vec![
+        //         ("key", ""),
+        //     ])
+        // );
+
+        // tests.insert(&b""[..], Done(&b""[..], vec![]));
+        for (input, expected) in &tests {assert_eq!(url_query_params(input), *expected);}
+    }
 
 
-#[test]
-fn test_url_query_params() {
-    let mut tests = HashMap::new();
-    // key=value & key2=value2
-    tests.insert(
-        &b"gfe_rd=cr&ei=zCZLWNPMHceAuAH2-oCYDw&gws_rd=ssl#newwindow=1&q=url+query+string"[..],
-        Done(&b""[..], vec![
-            ("gfe_rd", "cr"),
-            ("ei", "zCZLWNPMHceAuAH2-oCYDw"),
-            ("gws_rd", "ssl#newwindow=1"),
-            ("q", "url+query+string"),
-        ])
-    );
+    #[test]
+    fn test_url_query_params1() {
+        // key=value
+        // key
+        let mut tests = HashMap::new();
+        tests.insert(&b"key=value"[..], Done(&b""[..], ("key", "value")));
+        tests.insert(&b"key"[..], Done(&b""[..], ("key", "")));
+        // tests.insert(&b"key="[..], Incomplete(Needed::Size(4)));
+        tests.insert(&b"key="[..], Done(&b""[..], ("key", "")));
+        for (input, expected) in &tests {assert_eq!(url_query_params1(input), *expected);}
+    }
 
-    // test a key without a value:  /path?param
-    // param   -  ("param", "")
-    // tests.insert(
-    //     &b"key"[..],
-    //     Done(&b""[..], vec![
-    //         ("key", ""),
-    //     ])
-    // );
+    #[test]
+    fn test_url_query() {
+        // let mut tests = HashMap::new();
+        // tests.insert(
+        //     &b"?d=1"[..],
+        //     Done(&b""[..], HashMap::new().insert("d", "1"))
+        // );
+        // tests.insert(&b""[..], Done(&b""[..], vec![]));
+        // for (input, expected) in &tests {assert_eq!(url_query(input), *expected);}
+    }
 
-    // tests.insert(&b""[..], Done(&b""[..], vec![]));
-    for (input, expected) in &tests {assert_eq!(url_query_params(input), *expected);}
-}
+    #[test]
+    fn test_parse() {
+        let mut tests = HashMap::new();
+        tests.insert(&b"* 123 \n* asd "[..], "<ul><li>123 </li><li>asd </li></ul>");
+        // tests.insert(
+        //     // &b"qwerty\n\nhttps://host.pashinin.com\n\n"[..],
+        //     // &b" 123 \n\n asd "[..],
+        //     // "<p>123</p><p>asd</p>",
 
+        //     &b"* 123 \n* asd "[..],
+        //     // Done(&b""[..], Node{
+        //     //     children: None,
+        //     //     params: None,
+        //     //     class: NodeClass::ListUnnumberedItem,
+        //     // })
+        //     "* 123 \n* asd ",
+        // );
+        tests.insert(&b" 123 \n\n asd "[..], "<p>123</p><p>asd</p>",);
+        // for (input, expected) in &tests {assert_eq!(parse(input), *expected);}
 
-#[test]
-fn test_url_query_params1() {
-    // key=value
-    // key
-    let mut tests = HashMap::new();
-    tests.insert(&b"key=value"[..], Done(&b""[..], ("key", "value")));
-    tests.insert(&b"key"[..], Done(&b""[..], ("key", "")));
-    // tests.insert(&b"key="[..], Incomplete(Needed::Size(4)));
-    tests.insert(&b"key="[..], Done(&b""[..], ("key", "")));
-    for (input, expected) in &tests {assert_eq!(url_query_params1(input), *expected);}
-}
-
-
-#[test]
-fn test_url_query() {
-    // let mut tests = HashMap::new();
-    // tests.insert(
-    //     &b"?d=1"[..],
-    //     Done(&b""[..], HashMap::new().insert("d", "1"))
-    // );
-    // tests.insert(&b""[..], Done(&b""[..], vec![]));
-    // for (input, expected) in &tests {assert_eq!(url_query(input), *expected);}
-}
-
-// url_query
-
-
-#[test]
-fn test_parse() {
-    let mut tests = HashMap::new();
-    tests.insert(&b"* 123 \n* asd "[..], "<ul><li>123 </li><li>asd </li></ul>");
-    // tests.insert(
-    //     // &b"qwerty\n\nhttps://host.pashinin.com\n\n"[..],
-    //     // &b" 123 \n\n asd "[..],
-    //     // "<p>123</p><p>asd</p>",
-
-    //     &b"* 123 \n* asd "[..],
-    //     // Done(&b""[..], Node{
-    //     //     children: None,
-    //     //     params: None,
-    //     //     class: NodeClass::ListUnnumberedItem,
-    //     // })
-    //     "* 123 \n* asd ",
-    // );
-    tests.insert(&b" 123 \n\n asd "[..], "<p>123</p><p>asd</p>",);
-    // for (input, expected) in &tests {assert_eq!(parse(input), *expected);}
-
-    for (input, expected) in &tests {
-        let r = match parse(input) {
-            Done(_, node) => {node.to_string()},
-            _ => "error".to_string()
-        };
-        assert_eq!(r, *expected);
+        for (input, expected) in &tests {
+            let r = match parse(input) {
+                Done(_, node) => {node.to_string()},
+                _ => "error".to_string()
+            };
+            assert_eq!(r, *expected);
+        }
     }
 }

@@ -1,19 +1,10 @@
-// use nom::{IResult, space, alpha, alphanumeric, digit};
-// use itertools::Itertools;
-// PyTuple, PyDict, ToPyObject, PythonObject
-// use cpython::{PyObject, PyResult, Python, PyString};
-// use std::concat;
 use std::string::String;
 use std::string::ToString;
 use std::fmt;
-// use cpython::{ToPyObject, PyTuple};
-use std::fmt::{Debug, Display, Formatter};
-use std::cmp::PartialEq;
+use std::fmt::{Display, Formatter};
 use std::collections::HashMap;
-use std::borrow::Cow;
-// use parser::url_query;
 use nom::{IResult};
-use parser::{url_query};
+use common::{url_query};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum NodeClass{
@@ -65,7 +56,6 @@ impl<'a> Node<'a>{
             children: None,
             params: Some(x),
             class: NodeClass::URL,
-            // html: "".into(),
         }
     }
 

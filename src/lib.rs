@@ -1,3 +1,8 @@
+//! lib.rs is the main file which has `py_module_initializer!` macro.
+//!
+//! It defines an entry point in .SO library with exported python
+//! functions.
+
 // #![deny(missing_docs,
 //         missing_debug_implementations, missing_copy_implementations,
 //         trivial_casts, trivial_numeric_casts,
@@ -14,17 +19,14 @@ extern crate cpython;
 extern crate nom;
 use cpython::ToPyObject;
 pub use self::parser::*;
+mod common;
 pub mod parser;
-pub use self::generator::*;
-pub mod generator;
-mod paragraph;
 mod article;
 mod node;
 use self::article::*;
 
 
-// PyTuple, PyDict, ToPyObject, PythonObject
-use cpython::{PyObject, PyResult, Python, PyString, PyTuple};
+use cpython::{PyResult, Python, PyString};
 
 fn ast(py: Python, input_str: PyString) -> PyResult<PyString> {
     // println!("Rust says: {}", s.to_string(py));
@@ -78,6 +80,7 @@ fn ast(py: Python, input_str: PyString) -> PyResult<PyString> {
     }
 }
 
+/// asd
 fn html(py: Python, input_str: PyString) -> PyResult<PyString> {
     match input_str.to_string(py) {
         Ok(s) => {
@@ -88,12 +91,18 @@ fn html(py: Python, input_str: PyString) -> PyResult<PyString> {
     }
 }
 
+///
+/// Main Python lib init function
+///
 /// Docs about this macros:
 /// http://dgrunwald.github.io/rust-cpython/doc/cpython/macro.py_module_initializer.html
+///
+/// Arguments:
 ///
 /// 1. name: The module name as a Rust identifier.
 /// 2. py2_init: "init" + $name. Necessary because macros can't use concat_idents!().
 /// 3. py3_init: "PyInit_" + $name. Necessary because macros can't use concat_idents!().
+///
 py_module_initializer!(librparser, initlibrparser, PyInit_librparser, |py, m| {
     // try!(module.add(py, "add_two", py_fn!(add_two)));
     try!(m.add(py, "__doc__", "Module documentation string"));
