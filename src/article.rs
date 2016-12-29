@@ -1,6 +1,6 @@
 
 
-use cpython::{Python, PyString, ToPyObject};
+use cpython::{Python, PyString, ToPyObject, PyObject, PyResult, PythonObject, PyTuple};
 use std::borrow::Cow;
 // use generator::{Html};
 use parser::{parse};
@@ -53,14 +53,53 @@ impl<'a> fmt::Display for Article<'a> {
     }
 }
 
-/// Convert article to a python string (PyString)
+// /// Convert article to a python string (PyString)
+// impl<'a> ToPyObject for Article<'a>{
+//     type ObjectType = PyString;
+
+//     #[inline]
+//     fn to_py_object(&self, py: Python) -> PyString {
+//         PyString::new(py, &format!("{}", &self))
+//     }
+// }
+
+// use node::Node;
+// fn vtopv<'a> (v: Vec<Node<'a> >) -> &[PyObject] {
+//     &vec![] <'a>
+// }
+
+/// Convert article to a python object
 impl<'a> ToPyObject for Article<'a>{
-    type ObjectType = PyString;
-    // type ObjectType = Article<'a>;
+    type ObjectType = PyObject;
 
     #[inline]
-    fn to_py_object(&self, py: Python) -> PyString {
-        // PyString::new(py, &self.html())
-        PyString::new(py, &format!("{}", &self))
+    fn to_py_object(&self, py: Python) -> PyObject {
+        let s = self.src.to_string();
+        let parsed = parse(s.as_bytes());
+        // PyString::new(py, &format!("{}", &self)).into_object()
+        match parsed {
+            IResult::Done(_, node) => {
+                // prev:
+                // v.iter().fold("".to_string(),
+                //               |mut i,j| {i.push_str(&*j.to_string()); i})     // &*j.html()
+                // write!(f, "{}", node.to_string())
+                match node.children {
+                    Some(nodes) => {
+                        let children: Vec<PyObject> = nodes.iter()
+                            .map(|&ref x| x.to_py_object(py))
+                            .collect();
+                        PyTuple::new(py, &children.as_slice()).into_object()
+                    }
+                    //PyTuple::new(py, &nodes[..].into_object()).into_object(),
+                    // Some(nodes) => PyTuple::new(py, vtopv(nodes)).into_object(),
+                    None => PyTuple::new(py, &vec![]).into_object(),
+                }
+
+                // py.None().into_object()
+            },
+            IResult::Incomplete(x) => py.None().into_object(),
+            IResult::Error(e) => py.None().into_object(),
+        }
+        // PyTuple::new(py, self.src).into_object()
     }
 }

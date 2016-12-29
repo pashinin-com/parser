@@ -10,5 +10,5 @@ __copyright__ = 'Copyright 2016 Sergey Pashinin'
 
 try:
     from .librparser import *  # noqa
-except:
-    print("Error importing rparser library")
+except Exception as e:
+    print("Error importing rparser library", str(e))

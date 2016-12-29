@@ -4,6 +4,7 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::collections::HashMap;
 use nom::{IResult};
+use cpython::{PyDict, Python, PyString, ToPyObject, PyObject, PyResult, PythonObject, PyTuple};
 use common::{url_query};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -308,5 +309,123 @@ impl<'a> Display for Node<'a> {
                 }
             }
         }
+    }
+}
+
+
+// pub trait PythonObject: ToPyObject + Send + Sized + 'static {
+//     fn as_object(&self) -> &PyObject;
+//     fn into_object(self) -> PyObject;
+//     unsafe fn unchecked_downcast_from(PyObject) -> Self;
+//     unsafe fn unchecked_downcast_borrow_from(&PyObject) -> &Self;
+// }
+// impl<'a> PythonObject for Node<'a> {
+//     #[inline]
+//     fn as_object(self) -> &'a PyObject {
+//         &self.to_py_object()
+//     }
+
+//     #[inline]
+//     fn into_object(self) -> PyObject {
+//         // py.None().into_object()
+//         self
+//     }
+// }
+
+// pub fn into_object(self) -> PyObject {
+//         self.iter
+// }
+
+
+
+/// Convert Node to a python object
+impl<'a> ToPyObject for Node<'a>{
+    type ObjectType = PyObject;
+
+    #[inline]
+    fn to_py_object(&self, py: Python) -> PyObject {
+        // py.None().into_object()
+        match self.class {
+            NodeClass::Root => {
+                // PyTuple::new(py, &vec![]).into_object()
+                match self.children {
+                    Some(ref nodes) => {
+                        let children: Vec<PyObject> = nodes.iter()
+                            .map(|&ref x| x.to_py_object(py))
+                            .collect();
+                        PyTuple::new(py, &children.as_slice()).into_object()
+                    }
+                    None => {
+
+                        PyTuple::new(py, &vec![]).into_object()
+                    }
+                }
+            },
+            NodeClass::Paragraph => {
+                // PyTuple::new(py, &vec![]).into_object()
+                let d = PyDict::new(py);
+                d.set_item(py, "type", "paragraph");
+                // d.set_item(py, "items", PyTuple::new(py, &vec![]).into_object());
+                d.set_item(
+                    py,
+                    "items",
+                    match self.children {
+                        Some(ref nodes) => {
+                            let children: Vec<PyObject> = nodes.iter()
+                                .map(|&ref x| x.to_py_object(py))
+                                .collect();
+                            PyTuple::new(py, &children.as_slice()).into_object()
+                        }
+                        None => {
+
+                            PyTuple::new(py, &vec![]).into_object()
+                        }
+                    }
+                );
+
+
+                // PyString::new(py, &format!("{}", &self)).into_object()
+                d.into_object()
+            },
+            NodeClass::ListUnnumbered => {
+                PyTuple::new(py, &vec![]).into_object()
+            },
+            NodeClass::ListUnnumberedItem => {
+                PyTuple::new(py, &vec![]).into_object()
+            },
+            NodeClass::Header => {
+                PyTuple::new(py, &vec![]).into_object()
+            },
+            NodeClass::Code => {
+                PyTuple::new(py, &vec![]).into_object()
+            },
+            NodeClass::URL => {
+                PyTuple::new(py, &vec![]).into_object()
+            },
+            NodeClass::Comment => {
+                // PyTuple::new(py, &vec![]).into_object()
+                let d = PyDict::new(py);
+                d.set_item(py, "type", "comment");
+                d.set_item(py, "text", match self.params {
+                    Some(ref x) => {
+                        x.get("txt").unwrap()
+                    }
+                    _ => ""
+                });
+                d.into_object()
+            },
+            NodeClass::Text => {
+                let d = PyDict::new(py);
+                d.set_item(py, "type", "text");
+                d.set_item(py, "text", match self.params {
+                    Some(ref x) => {
+                        x.get("txt").unwrap()
+                    }
+                    _ => ""
+                });
+                d.into_object()
+            }
+        }
+
     }
 }
