@@ -14,8 +14,8 @@ ds:
 rd:
 	cargo rustc --release -- -C prefer-dynamic
 
-test:
-	cargo test
+# test:
+# 	cargo test
 
 wheel:
 	mkdir -p tmp/wheels
@@ -36,7 +36,17 @@ py3:
 	python3 setup.py build
 
 install:
-	sudo python3 setup.py install
+	python setup.py build_rust
+	python setup.py build
+	python setup.py bdist_wheel
+	sudo python setup.py install
+
+test:
+	python setup.py -q nosetests
+# py.test tests
+
+bench:
+	python tests/bench.py
 
 # py:
 # 	python27-sys

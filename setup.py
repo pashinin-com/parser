@@ -3,6 +3,27 @@ import re
 from setuptools import setup
 from rust_setuptools import (build_rust_cmdclass, build_install_lib_cmdclass,
                              RustDistribution)
+from setuptools.command.test import test as TestCommand
+
+
+class PyTest(TestCommand):
+    user_options = [('pytest-args=', 'a', "Arguments to pass into py.test")]
+
+    def initialize_options(self):
+        TestCommand.initialize_options(self)
+        self.pytest_args = []
+
+    def finalize_options(self):
+        TestCommand.finalize_options(self)
+        self.test_args = []
+        self.test_suite = True
+
+    def run_tests(self):
+        import pytest
+
+        errno = pytest.main(self.pytest_args)
+        sys.exit(errno)
+
 
 PY2 = sys.version_info[0] < 3
 PY3 = sys.version_info[0] >= 3
@@ -26,6 +47,8 @@ setup(
     requires=[],
     packages=['rparser'],
     distclass=RustDistribution,
+    tests_require=['nose'],
+    test_suite='nose.collector',
     cmdclass={
         'build_rust': build_rust_cmdclass(
             [('.', 'rparser')],
@@ -37,7 +60,8 @@ setup(
                 '--no-default-features'
             ]
         ),
-        'install_lib': build_install_lib_cmdclass()
+        'install_lib': build_install_lib_cmdclass(),
+        'test': PyTest,
     },
 
     zip_safe=False,
@@ -63,4 +87,5 @@ setup(
         'Programming Language :: Python :: Implementation :: CPython',
     ),
     platforms = ["Windows", "Linux", "Mac OS-X"],
+    # platforms='any',
 )
