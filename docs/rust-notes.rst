@@ -1,8 +1,3 @@
-.. rparser documentation master file, created by
-   sphinx-quickstart on Wed Dec 14 20:46:13 2016.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
-
 Rust notes and help
 ===================
 
