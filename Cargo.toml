@@ -11,15 +11,28 @@ crate-type = ["dylib"]
 
 
 [dependencies]
-# interpolate_idents = "0.0.9"
 nom = "^2.0"
-# itertools = "*"
-# cpython = { git = "https://github.com/dgrunwald/rust-cpython.git" }
-# cpython = "0.1"
 
+
+# cpython = "0.1"
+# cpython = { git = "https://github.com/dgrunwald/rust-cpython.git" }
+# cpython = { path = "/usr/data/local2/src/rust-cpython" }
 
 [dependencies.cpython]
-version = "0.1"
+# path = "/usr/data/local2/src/rust-cpython"
+git = "https://github.com/pashinin/rust-cpython.git"
+# git = "https://github.com/dgrunwald/rust-cpython.git"
+# version = "0.1"
 default-features = false
 # features = ["python27-sys"]
-features = ["python3-sys"]
+# features = ["python3-sys"]
+# optional = true
+# version = "0.1"
+
+
+
+[features]
+default = []
+py2 = ["cpython/python27-sys"]
+py3 = ["cpython/python3-sys"]
+unstable = []

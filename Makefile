@@ -26,6 +26,14 @@ wheel:
 # py2-release:
 # 	cargo rustc --release --features "python27-sys" -- -C prefer-dynamic
 
+py2:
+	python2.7 setup.py build_rust
+	python2.7 setup.py build
+
+# .PHONY: build
+py3:
+	python3 setup.py build_rust
+	python3 setup.py build
 
 install:
 	sudo python3 setup.py install
@@ -34,4 +42,4 @@ install:
 # 	python27-sys
 # cargo build --release --features "shumway pdf"
 
-# ipython3 -c 'import articleparser;articleparser.html(" 123  \cmd\n \n asd")'
+# ipython3 -c 'from rparser import Article;a=Article(" 123  \cmd\n \n asd").render()'

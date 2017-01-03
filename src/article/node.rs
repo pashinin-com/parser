@@ -6,6 +6,9 @@ use std::collections::HashMap;
 use nom::{IResult};
 use cpython::{PyDict, Python, PyString, ToPyObject, PyObject, PyResult, PythonObject, PyTuple};
 use common::{url_query};
+use std::convert::Into;
+use std::borrow::Cow;
+// use std::borrow::ToOwned;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum NodeClass{
@@ -20,39 +23,25 @@ pub enum NodeClass{
     Comment,
 }
 
-#[derive(PartialEq,Eq,Debug)]
-pub struct Node<'a> {
+#[derive(PartialEq,Eq,Debug,Clone)]
+pub struct Node {
     pub class: NodeClass,
-
-    // pub params: Option<HashMap<&'a str, &'a str> >,
-    pub params: Option<HashMap<&'a str, &'a str> >,
+    pub params: Option<HashMap<String, String>>,
     // Into<Cow<'a, str>>
-
-    // pub hostname: &'a str,
-    // pub path: &'a str,
-    // pub query: Option<&'a str>,
-    pub children: Option<Vec<Node<'a>>>,
-    // pub contents: String,
+    pub children: Option<Vec<Node>>,
 }
 
 
-impl<'a> Node<'a>{
-
+impl Node{
     /// Form URL node from params
-    pub fn new_url(
-        proto: &'a str,
-        hostname: &'a str,
-        path: &'a str,
-        query: &'a str,
-    ) -> Node<'a>
-    // pub fn new_url<S>(proto: S) -> Node<'a>
-        // where S: Into<Cow<'a, str>>
+    pub fn new_url<S>(proto: S, hostname: S, path: S, query: S) -> Node
+        where S: Into<String>
     {
         let mut x = HashMap::new();
-        x.insert("proto", proto);
-        x.insert("hostname", hostname);
-        x.insert("path", path);
-        x.insert("query", query);
+        x.insert("proto".to_string(), proto.into());
+        x.insert("hostname".to_string(), hostname.into());
+        x.insert("path".to_string(), path.into());
+        x.insert("query".to_string(), query.into());
         Node{
             children: None,
             params: Some(x),
@@ -62,9 +51,7 @@ impl<'a> Node<'a>{
 
 
     /// Root
-    pub fn new_root(
-        children: Vec<Node<'a>>,
-    ) -> Node<'a>
+    pub fn new_root(children: Vec<Node>) -> Node
     {
         Node{
             children: Some(children),
@@ -75,9 +62,7 @@ impl<'a> Node<'a>{
 
 
     /// Paragraph
-    pub fn new_paragraph(
-        children: Vec<Node<'a>>,
-    ) -> Node<'a>
+    pub fn new_paragraph(children: Vec<Node>) -> Node
     {
         Node{
             children: Some(children),
@@ -88,30 +73,32 @@ impl<'a> Node<'a>{
 
 
     /// Comment node
-    pub fn new_comment(txt: &'a str) -> Node<'a>
+    pub fn new_comment<S>(txt: S) -> Node
+        where S: Into<String>
     {
-        let mut x = HashMap::new();
-        x.insert("txt", txt);
+        let mut map = HashMap::new();
+        map.insert("txt".to_string(), txt.into());
         Node{
             children: None,
-            params: Some(x),
+            params: Some(map),
             class: NodeClass::Comment,
         }
     }
 
 
     /// List
-    pub fn new_list_unnumbered_item(txt: &'a str) -> Node<'a>
+    pub fn new_list_unnumbered_item<S>(txt: S) -> Node
+        where S: Into<String>
     {
         let mut x = HashMap::new();
-        x.insert("txt", txt);
+        x.insert("txt".to_string(), txt.into());
         Node{
             children: None,
             params: Some(x),
             class: NodeClass::ListUnnumberedItem,
         }
     }
-    pub fn new_list_unnumbered(items: Vec<Node<'a> >) -> Node<'a>
+    pub fn new_list_unnumbered(items: Vec<Node>) -> Node
     {
         Node{
             children: Some(items),
@@ -122,11 +109,12 @@ impl<'a> Node<'a>{
 
 
     /// H2 header
-    pub fn new_h2(txt: &'a str) -> Node<'a>
+    pub fn new_h2<S>(txt: S) -> Node
+        where S: Into<String>
     {
         let mut x = HashMap::new();
-        x.insert("txt", txt);
-        x.insert("tag", "h2");
+        x.insert("txt".to_string(), txt.into());
+        x.insert("tag".to_string(), "h2".to_string());
         Node{
             children: None,
             params: Some(x),
@@ -135,11 +123,12 @@ impl<'a> Node<'a>{
     }
 
     /// Code
-    pub fn new_code(txt: &'a str, lng: &'a str) -> Node<'a>
+    pub fn new_code<S>(txt: S, lng: S) -> Node
+        where S: Into<String>
     {
         let mut x = HashMap::new();
-        x.insert("txt", txt);
-        x.insert("lng", lng);
+        x.insert("txt".to_string(), txt.into());
+        x.insert("lng".to_string(), lng.into());
         Node{
             children: None,
             params: Some(x),
@@ -149,12 +138,11 @@ impl<'a> Node<'a>{
 
 
     /// Text node
-    pub fn new_text(
-        txt: &'a str,
-    ) -> Node<'a>
+    pub fn new_text<S>(txt: S) -> Node
+        where S: Into<String>
     {
         let mut x = HashMap::new();
-        x.insert("txt", txt);
+        x.insert("txt".to_string(), txt.into());
         Node{
             children: None,
             params: Some(x),
@@ -164,7 +152,7 @@ impl<'a> Node<'a>{
 }
 
 
-impl<'a> Display for Node<'a> {
+impl Display for Node {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self.class {
 
@@ -215,8 +203,8 @@ impl<'a> Display for Node<'a> {
                             x.get("path").unwrap(),
                             x.get("query").unwrap(),
                         );
-                        match hostname {
-                            &"www.youtube.com" => {
+                        match hostname.as_ref() {
+                            "www.youtube.com" => {
                                 let q = x.get("query").unwrap();
                                 let query_hm = url_query(q.as_bytes());
                                 match query_hm {
@@ -225,23 +213,16 @@ impl<'a> Display for Node<'a> {
                                         match video_code {
                                             // <iframe width="560" height="315" src="https://www.youtube.com/embed/g6ez7sbaiWc" frameborder="0" allowfullscreen></iframe>
                                             Some(code) => write!(f, r#"<iframe width="560" height="315" src="https://www.youtube.com/embed/{}" frameborder="0" allowfullscreen></iframe>"#, code),
-                                            // Some(code) => write!(f, "code: {}", code),
                                             _ => write!(f, r#"<a href="{0}">{0}</a>"#, url)
                                         }
-                                        // println!("i: {} | o: {:?}", i, o);
-                                        // return Ok(PyString::new(py, &o));
-                                        // write!(f, r#"get video"#)
                                     },
                                     // IResult::Incomplete(x) => println!("incomplete: {:?}", x),
                                     // IResult::Error(e) => println!("error: {:?}", e)
                                     _ => write!(f, r#"<a href="{0}">{0}</a>"#, url)
                                 }
-
-                                // write!(f, r#"<iframe width="560" height="315" src="https://www.youtube.com/embed/g6ez7sbaiWc" frameborder="0" allowfullscreen></iframe>"#)
                             }
                             _ => write!(f, r#"<a href="{0}">{0}</a>"#, url)
                         }
-
                     }
                     _ => {write!(f, "")}
                 }
@@ -338,8 +319,8 @@ impl<'a> Display for Node<'a> {
 
 
 
-/// Convert Node to a python object
-impl<'a> ToPyObject for Node<'a>{
+/// Convert Node to a python object (PyTuple, PyDict)
+impl ToPyObject for Node{
     type ObjectType = PyObject;
 
     #[inline]
@@ -429,3 +410,36 @@ impl<'a> ToPyObject for Node<'a>{
 
     }
 }
+
+
+// Example of implementing Cow:
+// https://github.com/tbu-/rust/commit/7a37b00045f44c637cda1617fbb06f2c62808cad
+// impl<'a> From<Node<'a>> for Cow<'a, Node<'a>>{
+//     // fn from(n: T) -> Cow<'a, [T]> {
+//     #[inline]
+//     fn from(n: Node<'a>) -> Cow<'a, Node<'a>> {
+//         Cow::Owned(n)
+//     }
+// }
+
+// impl<'a> From<&'a Node<'a>> for Cow<'a, Node<'a>>{
+//     fn from(n: &'a Node<'a>) -> Cow<'a, Node<'a>> {
+//         Cow:Borrowed(n)
+//     }
+// }
+
+
+// pub trait ToOwned {
+//     type Owned: Borrow<Self>;
+//     fn to_owned(&self) -> Self::Owned;
+// }
+
+// impl<'a> ToOwned for Node<'a> {
+//     // type Owned: Borrow<Self>;
+//     // type ObjectType = PyObject;
+//     type Owned = Borrow<Self>;
+
+//     fn to_owned(&self) -> Self::Owned{
+
+//     }
+// }

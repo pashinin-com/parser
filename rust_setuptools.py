@@ -15,7 +15,6 @@ from distutils.cmd import Command
 from distutils.command.install_lib import install_lib
 from distutils.dist import Distribution
 
-
 if sys.platform == 'win32':
     DYNAMIC_LIB_SUFFIX = '.dll'
 elif sys.platform == 'darwin':
@@ -115,7 +114,6 @@ class RustBuildCommand(Command):
                 pass
 
             target = os.path.join(target, dest)
-            print(target)
 
             for filename in os.listdir(dylib_path):
                 if filename.endswith(DYNAMIC_LIB_SUFFIX):

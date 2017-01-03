@@ -1,7 +1,11 @@
+import sys
 import re
 from setuptools import setup
 from rust_setuptools import (build_rust_cmdclass, build_install_lib_cmdclass,
                              RustDistribution)
+
+PY2 = sys.version_info[0] < 3
+PY3 = sys.version_info[0] >= 3
 
 
 with open('rparser/__init__.py', 'r') as fd:
@@ -23,7 +27,15 @@ setup(
     packages=['rparser'],
     distclass=RustDistribution,
     cmdclass={
-        'build_rust': build_rust_cmdclass([('.', 'rparser')]),
+        'build_rust': build_rust_cmdclass(
+            [('.', 'rparser')],
+            extra_cargo_args=[
+                '--features', 'py3',
+            ] if PY3 else
+            [
+                "--features", 'py2'
+            ]
+        ),
         'install_lib': build_install_lib_cmdclass()
     },
 

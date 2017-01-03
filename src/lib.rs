@@ -18,95 +18,60 @@ extern crate cpython;
 #[macro_use]
 extern crate nom;
 use cpython::ToPyObject;
-pub use self::parser::*;
+
 mod common;
-pub mod parser;
-mod article;
-mod node;
-use self::article::*;
+pub mod article;
+
+use nom::{IResult};
+use self::article::node::{Node, NodeClass};
+use self::article::parser::{parse};
+use self::article::Article;
 use cpython::PythonObject;
+use std::cell;
+use cpython::{PyResult, PyString, PyObject};
+use std::borrow::Cow;
 
 
-use cpython::{PyResult, Python, PyString, PyObject};
+py_class!(class Markdown |py| {
+    data src: cell::RefCell<PyString>;
+    data tree: cell::RefCell<Node>;
+    // self::article::node::Node
 
-// fn ast2(py: Python, input_str: PyString) -> PyResult<PyString> {
-//     // println!("Rust says: {}", s.to_string(py));
-//     // let res = parse(&input);
-//     // let a = Article::new(input_str);
-
-//     match input_str.to_string(py) {
-//         // Ok(input) => {
-//         Ok(s) => {
-//             // let greetings = format!("Rust says: Greetings {} !", input);
-//             // Value::Svalue(ScalarValue::Integer32(3))]
-//             // let greetings = format!("Rust says: Greetings {} !", input);
-//             // let v: Vec<Box<ToHtml>> = parse(input.to_string());
-
-
-//             // let res = category(ini_file);
-//             // let res = category(&input);
-//             // let res = command(&input);
-//             // // println!("Object: {:?}", res);
-//             // match res {
-//             //     IResult::Done(_, o) => {
-//             //         // println!("i: {} | o: {:?}", i, o);
-//             //         return Ok(PyString::new(py, &o));
-//             //     },
-//             //     // IResult::Incomplete(x) => println!("incomplete: {:?}", x),
-//             //     // IResult::Error(e) => println!("error: {:?}", e)
-//             //     _ => println!("error")
-//             // }
-
-//             // let r = generate_html(&v);
-//             // Ok(PyString::new(py, &r))
-
-//             // string
-//             // let output = PyString::new(py, &greetings);
-//             // Ok(output)
-//             let a = Article::new(s);
-
-//             // Ok(PyTuple::empty(py))
-//             Ok(a.to_py_object(py))
-//             // Ok(py.None())
-//         }
-//         Err(e) => Err(e)
-//     }
-// }
-
-
-// use cpython::{PyDict};
-
-py_class!(class AST |py| {
-    data number: i32;
-
-    def __new__(_cls, arg: i32) -> PyResult<AST> {
-        AST::create_instance(py, arg)
+    def __new__(_cls, src: PyString) -> PyResult<Markdown> {
+        let n = match parse(src.to_string_lossy(py).as_bytes()) {
+            IResult::Done(_, root) => root,
+            _ => Node{
+                children: None,
+                params: None,
+                class: NodeClass::Root,
+            }
+        };
+        Markdown::create_instance(py, cell::RefCell::new(src), cell::RefCell::new(n))
     }
-    def half(&self) -> PyResult<i32> {
-        println!("half() was called with self={:?}", self.number(py));
-        Ok(self.number(py) / 2)
+    def load(&self, src: PyString) -> PyResult<PyObject> {
+        *self.src(py).borrow_mut() = src;
+        *self.tree(py).borrow_mut() =
+            match parse(self.src(py).borrow().to_string_lossy(py).clone().as_bytes()) {
+                IResult::Done(_, root) => {root}
+                _ => Node{
+                    children: None,
+                    params: None,
+                    class: NodeClass::Root,
+                }
+            };
+        Ok(py.None().into_object())
+    }
+
+    def source(&self) -> PyResult<PyObject> {
+        let ref s = *self.src(py).borrow();
+        Ok(PyString::new(py, s.to_string(py).unwrap().as_ref()).into_object())
+    }
+
+    def render(&self) -> PyResult<PyString> {
+        Ok(PyString::new(py, &*self.tree(py).borrow().to_string()))
     }
 });
 
-/// Render article to HTML
-fn article(py: Python, input: PyString) -> PyResult<PyString> {
-    match input.to_string(py) {
-        Ok(s) => {
-            let a = Article::new(s);
-            // Ok(a.to_py_object(py))
-            Ok(PyString::new(py, &format!("{}", a.to_string())))
-        }
-        Err(e) => Err(e)
-    }
-}
-
-
-fn article_ast(py: Python, input: PyString) -> PyResult<PyObject> {
-    match input.to_string(py) {
-        Ok(s) => {Ok(Article::new(s).to_py_object(py).into_object())}
-        Err(e) => Err(e)
-    }
-}
 
 ///
 /// Main Python lib init function
@@ -124,7 +89,9 @@ py_module_initializer!(librparser, initlibrparser, PyInit_librparser, |py, m| {
     // try!(module.add(py, "add_two", py_fn!(add_two)));
     try!(m.add(py, "__doc__", "Module documentation string"));
     // try!(m.add(py, "AST", py_fn!(py, ASTree())));
-    try!(m.add(py, "article_ast", py_fn!(py, article_ast(input: PyString))));
-    try!(m.add(py, "article", py_fn!(py, article(input: PyString))));
+    try!(m.add_class::<Article>(py));
+    try!(m.add_class::<Markdown>(py));
+    // try!(m.add(py, "article_ast", py_fn!(py, article_ast(input: PyString))));
+    // try!(m.add(py, "article", py_fn!(py, article(input: PyString))));
     Ok(())
 });

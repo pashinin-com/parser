@@ -1,9 +1,12 @@
 //! Some parser functions
 
 use nom::{eol};
-use node::{Node};
+use super::node::{Node};
 use std::str::from_utf8;
 use common::*;
+use std::borrow::Cow;
+
+// pub mod node;
 
 // fn not_eol(chr:u8) -> bool {
 //     chr != '\r' as u8 && chr == '\n' as u8
@@ -63,7 +66,7 @@ named!(comment<Node>,
                char!( '%' ) >>
                    opt!(take_while!(space_but_not_eol)) >>
                    txt: map_res!(is_not!( "\r\n" ), from_utf8) >>
-                   (Node::new_comment(txt))
+                   (Node::new_comment(txt.to_string()))
            )
        // )
 );
@@ -80,7 +83,7 @@ named!(pub list_unnumbered_item<Node>,
                txt: map_res!(is_not!( "\r\n" ), from_utf8) >>
                opt!(take_while!(space_but_not_eol)) >>
                // opt!(eol) >>
-               (Node::new_list_unnumbered_item(txt))
+               (Node::new_list_unnumbered_item(txt.to_string()))
        )
 );
 
@@ -104,7 +107,7 @@ named!(h2<Node>,
            tag!( "##" ) >>
                opt!(take_while!(space_but_not_eol)) >>
                txt: map_res!(is_not!( "\r\n" ), from_utf8) >>
-               (Node::new_h2(txt))
+               (Node::new_h2(txt.to_string()))
        )
 );
 
@@ -139,7 +142,7 @@ named!(code<Node>,
                txt: map_res!(take_until!("```"), from_utf8) >>
                tag!("```") >>
            // params: separated_list!(char!('&'), url_query_params1) >>
-           (Node::new_code(txt, language))
+           (Node::new_code(txt.to_string(), language.to_string()))
                // (params.iter().fold(
                //         HashMap::new(),
                //         |mut T, tuple| {T.insert(tuple.0, tuple.1); T})
@@ -160,15 +163,15 @@ named!(pub url<Node>,
             query: opt!(map_res!(recognize!(url_query), from_utf8)) >>
             (
                 Node::new_url(
-                    proto, hostname,
+                    proto.to_string(), hostname.to_string(),
                     // path,
                     match path {
-                        Some(x) => x,
-                        None => "",
+                        Some(x) => x.to_string(),
+                        None => "".to_string(),
                     },
                     match query {
-                        Some(x) => x,
-                        None => "",
+                        Some(x) => x.to_string(),
+                        None => "".to_string(),
                     }
                     // query
                 )
@@ -206,7 +209,7 @@ named!(pub parse<Node>,
 named!(symbols<Node>,
        do_parse!(
            txt: map_res!(take_while!(not_space), from_utf8) >>
-               (Node::new_text(txt))
+               (Node::new_text(txt.to_string()))
        )
 );
 
@@ -277,7 +280,7 @@ mod tests {
     use super::*;
     use nom::IResult::{Done, Incomplete, Error};
     use std::collections::HashMap;
-    use node::{Node, NodeClass};
+    use super::super::node::{Node, NodeClass};
     use std::str::from_utf8;
     use common::*;
     // use std::str::from_utf8;
@@ -305,7 +308,7 @@ mod tests {
     fn test_list_unnumbered_item() {
         let mut tests = HashMap::new();
         let mut x = HashMap::new();
-        x.insert("txt", "asd");
+        x.insert("txt".to_string(), "asd".to_string());
         tests.insert(
             &b"* asd"[..],
             Done(&b""[..], Node{
@@ -323,9 +326,9 @@ mod tests {
     fn test_list_unnumbered() {
         let mut tests = HashMap::new();
         let mut x = HashMap::new();
-        x.insert("txt", "asd");
+        x.insert("txt".to_string(), "asd".to_string());
         let mut x2 = HashMap::new();
-        x2.insert("txt", "123");
+        x2.insert("txt".to_string(), "123".to_string());
         tests.insert(
             &b"*asd\n*123"[..],
             Done(&b""[..], Node{
@@ -375,10 +378,10 @@ mod tests {
     fn test_url() {
         let mut tests = HashMap::new();
         let mut x = HashMap::new();
-        x.insert("proto", "https");
-        x.insert("hostname", "www.youtube.com");
-        x.insert("path", "/watch");
-        x.insert("query", "?v=g6ez7sbaiWc");
+        x.insert("proto".to_string(), "https".to_string());
+        x.insert("hostname".to_string(), "www.youtube.com".to_string());
+        x.insert("path".to_string(), "/watch".to_string());
+        x.insert("query".to_string(), "?v=g6ez7sbaiWc".to_string());
         tests.insert(
             &b"https://www.youtube.com/watch?v=g6ez7sbaiWc"[..],
             // Done(&b""[..], URL{proto:"https", hostname:"host.pashinin.com", path:"",
@@ -407,10 +410,10 @@ mod tests {
     fn test_paragraph() {
         let mut tests = HashMap::new();
         let mut x = HashMap::new();
-        x.insert("proto", "https");
-        x.insert("hostname", "host.pashinin.com");
-        x.insert("path", "");
-        x.insert("query", "");
+        x.insert("proto".to_string(), "https".to_string());
+        x.insert("hostname".to_string(), "host.pashinin.com".to_string());
+        x.insert("path".to_string(), "".to_string());
+        x.insert("query".to_string(), "".to_string());
         tests.insert(
             &b"https://host.pashinin.com"[..],
             Done(&b""[..], Node{
