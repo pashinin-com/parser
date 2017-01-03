@@ -24,9 +24,9 @@ matrix:
     - os: osx
       language: python
       python: "3.5"
-    # - os: linux
-    #   language: python
-    #   python: "2.7"
+    - os: linux
+      language: python
+      python: "2.7"
     #   sudo: required
     - os: linux
       language: python
