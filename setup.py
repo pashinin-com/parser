@@ -33,7 +33,8 @@ setup(
                 '--features', 'py3',
             ] if PY3 else
             [
-                "--features", 'py2'
+                "--features", 'py2',
+                '--no-default-features'
             ]
         ),
         'install_lib': build_install_lib_cmdclass()
