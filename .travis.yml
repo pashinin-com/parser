@@ -95,8 +95,8 @@ script:
 before_deploy:
   - sudo pip install twine
   - ls -la dist
-  # - mmv "dist/rparser-*-*-*-*_*.whl" "dist/rparser-#1-py2.py3-none-any.whl"
-  - mmv "dist/rparser-*-*-*-*_*.whl" "dist/rparser-#1-py3-none-any.whl"
+  - mmv "dist/rparser-*-*-*-*_*.whl" "dist/rparser-#1-py2.py3-none-any.whl"
+  # - mmv "dist/rparser-*-*-*-*_*.whl" "dist/rparser-#1-py3-none-any.whl"
   - ls -la dist
   # rparser-0.1.6-cp35-cp35m-linux_x86_64.whl
 
