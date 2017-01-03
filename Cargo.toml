@@ -32,7 +32,7 @@ default-features = false
 
 
 [features]
-default = []
+default = ["cpython/python3-sys"]
 py2 = ["cpython/python27-sys"]
 py3 = ["cpython/python3-sys"]
 unstable = []
