@@ -19,7 +19,7 @@ extern crate cpython;
 extern crate nom;
 use cpython::ToPyObject;
 
-mod common;
+pub mod common;
 pub mod article;
 
 use nom::{IResult};

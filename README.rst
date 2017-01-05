@@ -9,3 +9,6 @@ This is a Python 3.5 module (.so file).
 .. code-block:: bash
 
    pip install rparser
+
+
+http://rparser.readthedocs.io/en/latest/

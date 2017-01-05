@@ -155,7 +155,7 @@ named!(code<Node>,
 /// URL parser
 named!(pub url<Node>,
     do_parse!(
-        proto: map_res!(url_proto, from_utf8)  >>
+        proto: map_res!(uri_scheme, from_utf8)  >>
             tag!("://")   >>
             hostname: map_res!(hostname, from_utf8) >>
             // path: opt!(map_res!(is_not!( "? \t\r\n" ), from_utf8)) >>
@@ -285,24 +285,7 @@ mod tests {
     use common::*;
     // use std::str::from_utf8;
 
-    #[test]
-    fn test_domain() {
-        let mut tests = HashMap::new();
-        tests.insert("pashinin.com", "pashinin.com");
-        tests.insert("тест.рф", "тест.рф");
-        // .as_bytes()
-        for (input, expected) in &tests {
-            // let i = input.as_bytes();
-            match domain_name(input.as_bytes()) {
-                Done(_, output) => {
-                    // assert_eq!(from_utf8(&output).unwrap(), from_utf8(expected).unwrap());
-                    assert_eq!(&from_utf8(&output).unwrap(), expected);
-                },
-                Incomplete(x) => panic!("incomplete: {:?}", x),
-                Error(e) => panic!("error: {:?}", e),
-            }
-        }
-    }
+
 
     #[test]
     fn test_list_unnumbered_item() {

@@ -1,11 +1,15 @@
 
 import os
 import re
-import mistune
+# import mistune
 root = os.path.dirname(__file__)
 
 known = []
-m = mistune.Markdown()
+# m = mistune.Markdown()
+
+# This will fail because compiled .SO files go to /build dir.
+# You can symlink .SO file from /build to /rparser.
+from rparser import Markdown
 
 
 def render(folder, name):
@@ -13,7 +17,10 @@ def render(folder, name):
     with open(filepath) as f:
         content = f.read()
 
-    html = m.parse(content)
+    html = ''
+    mm = Markdown(content)
+    html = mm.render()
+    # html = m.parse(content)
 
     filepath = os.path.join(folder, name + '.html')
     with open(filepath) as f:
@@ -24,7 +31,7 @@ def render(folder, name):
     for i, s in enumerate(html):
         if s != result[i]:
             begin = max(i - 30, 0)
-            msg = '\n\n%s\n------Not Equal(%d)------\n%s' % (
+            msg = '\nWe have:\n\n%s\n------Not Equal(%d)------\nExpected:\n%s' % (
                 html[begin:i+30], i, result[begin:i+30]
             )
             raise ValueError(msg)
