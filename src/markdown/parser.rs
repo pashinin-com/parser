@@ -6,7 +6,6 @@ use std::str::from_utf8;
 use common::*;
 use std::borrow::Cow;
 
-
 /// Paragraphs are separated with 2 new lines with any number of spaces
 /// between, before and after them.
 named!(pub paragraph_separator,
@@ -27,12 +26,14 @@ named!(pub paragraph_separator,
 
 /// Comment
 named!(comment<Node>,
-       do_parse!(
-           char!( '%' ) >>
-           opt!(take_while!(space_but_not_eol)) >>
-           txt: map_res!(is_not!( "\r\n" ), from_utf8) >>
-           (Node::new_comment(txt.to_string()))
-       )
+       // recognize!(
+           do_parse!(
+               char!( '%' ) >>
+                   opt!(take_while!(space_but_not_eol)) >>
+                   txt: map_res!(is_not!( "\r\n" ), from_utf8) >>
+                   (Node::new_comment(txt.to_string()))
+           )
+       // )
 );
 
 
@@ -42,12 +43,12 @@ named!(comment<Node>,
 named!(pub list_unnumbered_item<Node>,
        do_parse!(
            opt!(eol) >>
-           char!( '*' ) >>
-           opt!(take_while!(space_but_not_eol)) >>
-           txt: map_res!(is_not!( "\r\n" ), from_utf8) >>
-           opt!(take_while!(space_but_not_eol)) >>
-           // opt!(eol) >>
-           (Node::new_list_unnumbered_item(txt.to_string()))
+               char!( '*' ) >>
+               opt!(take_while!(space_but_not_eol)) >>
+               txt: map_res!(is_not!( "\r\n" ), from_utf8) >>
+               opt!(take_while!(space_but_not_eol)) >>
+               // opt!(eol) >>
+               (Node::new_list_unnumbered_item(txt.to_string()))
        )
 );
 
@@ -102,47 +103,17 @@ named!(h2<Node>,
 named!(code<Node>,
        do_parse!(
            tag!("```") >>
-           language: map_res!(take_while!(not_space), from_utf8) >>
-           txt: map_res!(take_until!("```"), from_utf8) >>
-           tag!("```") >>
+               language: map_res!(take_while!(not_space), from_utf8) >>
+               txt: map_res!(take_until!("```"), from_utf8) >>
+               tag!("```") >>
            // params: separated_list!(char!('&'), url_query_params1) >>
            (Node::new_code(txt.to_string(), language.to_string()))
-           // (params.iter().fold(
-           //         HashMap::new(),
-           //         |mut T, tuple| {T.insert(tuple.0, tuple.1); T})
-           // )
+               // (params.iter().fold(
+               //         HashMap::new(),
+               //         |mut T, tuple| {T.insert(tuple.0, tuple.1); T})
+               // )
        )
 );
-
-
-/// internal link
-named!(pub internal_link1<Node>,
-    do_parse!(
-        tag!("[[") >>
-        link: map_res!(take_until!("|"), from_utf8) >>
-        tag!("|") >>
-        text: map_res!(take_until!("]]"), from_utf8) >>
-        tag!("]]") >>
-        (Node::new_internal_link(link, text)
-        )
-    )
-);
-named!(pub internal_link2<Node>,
-    do_parse!(
-        tag!("[[") >>
-        link: map_res!(take_until!("]]"), from_utf8) >>
-        tag!("]]") >>
-        (Node::new_internal_link(link, link)
-        )
-    )
-);
-named!(internal_link<Node>,
-       alt_complete!(
-           internal_link1 |
-           internal_link2
-       )
-);
-
 
 
 
@@ -150,27 +121,27 @@ named!(internal_link<Node>,
 named!(pub url<Node>,
     do_parse!(
         proto: map_res!(uri_scheme, from_utf8)  >>
-        tag!("://")   >>
-        hostname: map_res!(hostname, from_utf8) >>
-        // path: opt!(map_res!(is_not!( "? \t\r\n" ), from_utf8)) >>
-        path: opt!(map_res!(is_not!( "? \t\r\n" ), from_utf8)) >>
-        query: opt!(map_res!(recognize!(url_query), from_utf8)) >>
-        (
-            Node::new_url(
-                proto.to_string(), hostname.to_string(),
-                // path,
-                match path {
-                    Some(x) => x.to_string(),
-                    None => "".to_string(),
-                },
-                match query {
-                    Some(x) => x.to_string(),
-                    None => "".to_string(),
-                }
-                // query
+            tag!("://")   >>
+            hostname: map_res!(hostname, from_utf8) >>
+            // path: opt!(map_res!(is_not!( "? \t\r\n" ), from_utf8)) >>
+            path: opt!(map_res!(is_not!( "? \t\r\n" ), from_utf8)) >>
+            query: opt!(map_res!(recognize!(url_query), from_utf8)) >>
+            (
+                Node::new_url(
+                    proto.to_string(), hostname.to_string(),
+                    // path,
+                    match path {
+                        Some(x) => x.to_string(),
+                        None => "".to_string(),
+                    },
+                    match query {
+                        Some(x) => x.to_string(),
+                        None => "".to_string(),
+                    }
+                    // query
+                )
             )
-        )
-    )
+       )
 );
 
 // pub fn parse(input: &[u8]) -> IResult<&[u8], Paragraph, u32> {
@@ -184,7 +155,7 @@ named!(root_element<Node>,
                paragraph
                // list_unnumbered
            ) >>
-           (block)
+               (block)
        )
 );
 
@@ -193,20 +164,35 @@ named!(root_element<Node>,
 named!(pub parse<Node>,
        do_parse!(
            opt!(take_while!(any_space)) >>
-           pars: separated_list!(paragraph_separator, root_element) >>
-           opt!(take_while!(any_space)) >>
+               pars: separated_list!(paragraph_separator, root_element) >>
+               opt!(take_while!(any_space)) >>
            // (pars)
-           (Node::new_root(pars))
+               (Node::new_root(pars))
        )
 );
 
 named!(symbols<Node>,
        do_parse!(
            txt: map_res!(take_while!(not_space), from_utf8) >>
-           (Node::new_text(txt.to_string()))
+               (Node::new_text(txt.to_string()))
        )
 );
 
+// named!(tag,
+//        // delimited!(char!('<'), alpha, char!('>'))
+//        recognize!(
+//        do_parse!(
+//            char!('<') >>
+//                opt!(take_while!(any_space)) >>
+//                name: map_res!(take_while!(not_space), from_utf8) >>
+//                params: map_res!(is_not!( ">" ), from_utf8) >>
+//                opt!(char!('/')) >>
+//                char!('>') >>
+//                ()
+//        ))
+// );
+
+// named!(closing_tag, delimited!(tag!("</"), alpha, char!('>')));
 
 /// Anything between spaces in 1 paragraph
 named!(word<Node>,
@@ -214,7 +200,6 @@ named!(word<Node>,
            block: alt_complete!(
                code |
                h2 |
-               internal_link |
                url |
                comment |
                list_unnumbered |
@@ -232,7 +217,7 @@ named!(pub word_separator,
                    opt!(take_while!(space_but_not_eol)) >>
                    opt!(eol) >>
                    opt!(take_while!(space_but_not_eol)) >>
-                   ()
+                       ()
                )
            )
        )
@@ -242,10 +227,13 @@ named!(pub word_separator,
 named!(pub paragraph<Node>,
        do_parse!(
            words: separated_list!(word_separator, word) >>
-           (Node::new_paragraph(words))
+           // nl: opt!(paragraph_separator) >>
+           // nl: opt!(take_while!(space_but_not_eol)) >>
+               (
+                   Node::new_paragraph(words)
+               )
        )
 );
-
 
 
 #[cfg(test)]

@@ -5,7 +5,6 @@ use std::collections::HashMap;
 use std::str;
 use std::str::from_utf8;
 
-
 macro_rules! map(
     { $($key:expr => $value:expr),+ } => {
         {
@@ -17,6 +16,30 @@ macro_rules! map(
         }
      };
 );
+
+// pub mod node;
+
+// fn not_eol(chr:u8) -> bool {
+//     chr != '\r' as u8 && chr == '\n' as u8
+// }
+pub fn space_but_not_eol(chr:u8) -> bool {
+    chr == ' ' as u8 || chr == '\t' as u8
+}
+pub fn any_space(chr:u8) -> bool {
+    chr == ' ' as u8 || chr == '\t' as u8 || chr == '\r' as u8 || chr == '\n' as u8
+}
+pub fn not_space(chr:u8) -> bool {!any_space(chr)}
+
+// fn is_line_ending_or_comment(chr:char) -> bool {
+//   chr == ';' || chr == '\n'
+// }
+
+// named!(alphanumeric<&str,&str>,         take_while_s!(is_alphanumeric));
+// named!(not_line_ending<&str,&str>,      is_not_s!("\r\n"));
+// named!(space_or_eol<&str,&str>, is_a_s!(" \t\r\n"));
+// named!(space<&str,&str>, is_a_s!(" \t\r\n"));
+// named!(space<&str,&str>,                take_while_s!(is_space));
+
 
 
 /// URI scheme

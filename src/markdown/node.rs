@@ -12,6 +12,40 @@ use std::borrow::Cow;
 #[cfg(feature = "python")]
 use cpython::{PyDict, Python, PyString, ToPyObject, PyObject, PyResult, PythonObject, PyTuple};
 
+#[derive(Copy, Clone, Debug)]
+pub enum Alignment {
+    None,
+    Left,
+    Center,
+    Right,
+}
+
+#[derive(Clone, Debug)]
+pub enum Tag<'a> {
+    // block-level tags
+    Paragraph,
+    Rule,
+    Header(i32),
+    BlockQuote,
+    CodeBlock(Cow<'a, str>),
+    List(Option<usize>),  // TODO: add delim and tight for ast (not needed for html)
+    Item,
+    FootnoteDefinition(Cow<'a, str>),
+
+    // tables
+    Table(Vec<Alignment>),
+    TableHead,
+    TableRow,
+    TableCell,
+
+    // span-level tags
+    Emphasis,
+    Strong,
+    Code,
+    Link(Cow<'a, str>, Cow<'a, str>),
+    Image(Cow<'a, str>, Cow<'a, str>),
+}
+
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum NodeClass{
@@ -24,7 +58,6 @@ pub enum NodeClass{
     URL,
     Text,
     Comment,
-    LinkInternal,
 }
 
 #[derive(PartialEq,Eq,Debug,Clone)]
@@ -110,23 +143,6 @@ impl Node{
             class: NodeClass::ListUnnumbered,
         }
     }
-
-
-    pub fn new_internal_link<S>(url: S, text: S) -> Node
-        where S: Into<String>
-    {
-        let mut x = HashMap::new();
-        x.insert("url".to_string(), url.into());
-        x.insert("text".to_string(), text.into());
-        Node{
-            children: None,
-            params: Some(x),
-            class: NodeClass::LinkInternal,
-        }
-    }
-
-
-
 
 
     /// H2 header
@@ -310,18 +326,6 @@ impl Display for Node {
                     _ => {write!(f, "")}
                 }
             }
-
-            NodeClass::LinkInternal => {
-                // TODO: find links to existing articles
-                // TODO: add unknown links to parser's list
-                match self.params {
-                    Some(ref x) => {
-                        write!(f, "<a class=\"redlink\" href=\"/articles/{}\">{}</a>", x.get("url").unwrap(),
-                               x.get("text").unwrap())
-                    }
-                    _ => {write!(f, "")}
-                }
-            }
         }
     }
 }
@@ -430,17 +434,6 @@ impl ToPyObject for Node{
                 d.into_object()
             },
             NodeClass::Text => {
-                let d = PyDict::new(py);
-                d.set_item(py, "type", "text");
-                d.set_item(py, "text", match self.params {
-                    Some(ref x) => {
-                        x.get("txt").unwrap()
-                    }
-                    _ => ""
-                });
-                d.into_object()
-            },
-            NodeClass::LinkInternal => {
                 let d = PyDict::new(py);
                 d.set_item(py, "type", "text");
                 d.set_item(py, "text", match self.params {
