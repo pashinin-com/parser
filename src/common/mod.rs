@@ -1,23 +1,10 @@
-//! This crate contains parser functions that can be common with other
-//! parsers.
+//! Common parsing functions that can be used elsewhere.
 
+pub mod tree;
 use std::collections::HashMap;
 use std::str;
 use std::str::from_utf8;
-
-macro_rules! map(
-    { $($key:expr => $value:expr),+ } => {
-        {
-            let mut m = ::std::collections::HashMap::new();
-            $(
-                m.insert($key, $value);
-            )+
-            m
-        }
-     };
-);
-
-// pub mod node;
+use nom::{eol};
 
 // fn not_eol(chr:u8) -> bool {
 //     chr != '\r' as u8 && chr == '\n' as u8
@@ -39,6 +26,38 @@ pub fn not_space(chr:u8) -> bool {!any_space(chr)}
 // named!(space_or_eol<&str,&str>, is_a_s!(" \t\r\n"));
 // named!(space<&str,&str>, is_a_s!(" \t\r\n"));
 // named!(space<&str,&str>,                take_while_s!(is_space));
+
+named!(pub space_not_eol, take_while!(space_but_not_eol));
+
+
+named!(pub space_max1_eol,
+       recognize!(
+           complete!(
+               do_parse!(
+                   opt!(space_not_eol) >>
+                   opt!(eol) >>
+                   opt!(space_not_eol) >>
+                   ()
+               )
+           )
+       )
+);
+
+
+named!(pub space_min_2eol,
+       complete!(
+           recognize!(
+               do_parse!(
+                   opt!(take_while!(space_but_not_eol)) >>
+                   eol >>
+                   opt!(take_while!(space_but_not_eol)) >>
+                   eol >>
+                   opt!(take_while!(any_space)) >>
+                   ()
+               )
+           )
+       )
+);
 
 
 
@@ -213,6 +232,27 @@ mod tests {
     use nom::IResult::{Done, Incomplete, Error};
     use std::collections::HashMap;
     use std::str::from_utf8;
+
+    #[test]
+    fn test_space_max1_eol() {
+        let mut tests = HashMap::new();
+        tests.insert(&b" \n \n "[..], Done(&b"\n "[..], &b" \n "[..]));
+        for (input, expected) in &tests {
+            assert_eq!(space_max1_eol(input), *expected);
+        }
+    }
+
+    #[test]
+    fn test_space_min_2eol() {
+        let mut tests = HashMap::new();
+        tests.insert(&b" \n \n "[..], Done(&b""[..], &b" \n \n "[..]));
+        tests.insert(&b"\n\n"[..], Done(&b""[..], &b"\n\n"[..]));
+        tests.insert(&b"\r\n \r\n"[..], Done(&b""[..], &b"\r\n \r\n"[..]));
+        tests.insert(&b"\r\n\r\n"[..], Done(&b""[..], &b"\r\n\r\n"[..]));
+        for (input, expected) in &tests {
+            assert_eq!(space_min_2eol(input), *expected);
+        }
+    }
 
 
     #[test]

@@ -1,8 +1,9 @@
-//! lib.rs is the main file which has `py_module_initializer!` macro.
+//! `rparser` is just an experiment to parse some stuff.
 //!
-//! It defines an entry point in .SO library with exported python
-//! functions.
+//! [PyPI](https://pypi.python.org/pypi/rparser)
 
+// TODO
+// #![deny(missing_docs)]
 // #![deny(missing_docs,
 //         missing_debug_implementations, missing_copy_implementations,
 //         trivial_casts, trivial_numeric_casts,
@@ -21,21 +22,14 @@ extern crate nom;
 
 pub mod common;
 pub mod article;
-pub mod markdown;
+pub mod latex;
+// pub mod markdown;
 pub mod html;
 
-use nom::{IResult};
-use self::article::node::{Node, NodeClass};
-use self::article::parser::{parse};
-use std::cell;
-use std::borrow::Cow;
-
 #[cfg(feature = "python")]
-use cpython::{PyResult, PyString, PyObject, PythonObject, ToPyObject};
-#[cfg(feature = "python")]
-use self::article::Article;
-#[cfg(feature = "python")]
-use self::markdown::Markdown;
+use self::article::{article_render};
+// #[cfg(feature = "python")]
+// use self::markdown::Markdown;
 
 
 ///
@@ -53,7 +47,11 @@ use self::markdown::Markdown;
 #[cfg(feature = "python")]
 py_module_initializer!(librparser, initlibrparser, PyInit_librparser, |py, m| {
     try!(m.add(py, "__doc__", "Module documentation string"));
-    try!(m.add_class::<Article>(py));
-    try!(m.add_class::<Markdown>(py));
+    // To add a class named "Article":
+    // try!(m.add_class::<Article>(py));
+    // try!(m.add(py, "run", py_fn!(py, run(*args, **kwargs))));
+    // try!(m.add(py, "article_render", py_fn!(py, article_render(*args, **kwargs))));
+    try!(m.add(py, "article_render", py_fn!(py, article_render(*args, **kwargs))));
+    // try!(m.add_class::<Markdown>(py));
     Ok(())
 });

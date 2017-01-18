@@ -1,18 +1,13 @@
 mod parser;
 mod node;
-
 use std::collections::HashMap;
 use std::str;
-use std::str::from_utf8;
 use std::borrow::Cow;
 use std::cell;
-use nom::{IResult};
-use self::parser::{parse};
-use self::node::{Node, NodeClass};
 
 
 #[cfg(feature = "python")]
-use cpython::{PyResult, PyString, PyObject, Python, PyErr, exc, PythonObject, ToPyObject, ObjectProtocol};
+use cpython::{PyResult, PyString, PyObject, PythonObject};
 
 /// Header
 // named!(header<Node>,
@@ -101,38 +96,19 @@ impl<'a> From<Parser<'a>> for Cow<'a, Parser<'a>>{
 
 #[cfg(feature = "python")]
 py_class!(class Markdown |py| {
-    // data src: cell::RefCell<PyString>;
     data parser: cell::RefCell<Parser<'static>>;
 
     def __new__(_cls, src: PyString) -> PyResult<Markdown> {
         // let ref s = &*src.str(py).unwrap();
         let m = Markdown::create_instance(
             py,
-            // cell::RefCell::new(Parser::new(Cow::from(src))),  // for String
             cell::RefCell::new(Parser::new(src.into_object().extract::<String>(py).unwrap())),
-            // cell::RefCell::new(Parser::new(Cow::from(src.str(py).unwrap().to_string_lossy(py)))),  // from PyObject
-            // cell::RefCell::new(Parser::new(Cow::from(s.to_string_lossy(py)))),
-            // cell::RefCell::new(Parser::new(Cow::from(src.to_string_lossy(py)))),
-            // cell::RefCell::new(Parser::new(src.to_string_lossy(py))),
         );
         m
-        // let msg = format!("Expected tuple of length ");
-        // Err(PyErr::fetch(py))
-        // Err(PyErr::new_lazy_init(py.get_type::<exc::ValueError>(), Some(msg.to_py_object(py).into_object())))
     }
     def load(&self, src: PyString) -> PyResult<PyObject> {
         let mut p = self.parser(py).borrow_mut();
         p.load(src.into_object().extract::<String>(py).unwrap());
-        // match parse(self.src(py).borrow().to_string_lossy(py).clone().as_bytes()) {
-        // *self.tree(py).borrow_mut() =
-        //     match parse(self.src(py).borrow().to_string_lossy(py).clone().as_bytes()) {
-        //         IResult::Done(_, root) => {root}
-        //         _ => Node{
-        //             children: None,
-        //             params: None,
-        //             class: NodeClass::Root,
-        //         }
-        //     };
         Ok(py.None().into_object())
     }
 

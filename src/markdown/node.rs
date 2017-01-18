@@ -383,7 +383,7 @@ impl ToPyObject for Node{
             NodeClass::Paragraph => {
                 // PyTuple::new(py, &vec![]).into_object()
                 let d = PyDict::new(py);
-                d.set_item(py, "type", "paragraph");
+                d.set_item(py, "type", "paragraph").unwrap();
                 // d.set_item(py, "items", PyTuple::new(py, &vec![]).into_object());
                 d.set_item(
                     py,
@@ -400,7 +400,7 @@ impl ToPyObject for Node{
                             PyTuple::new(py, &vec![]).into_object()
                         }
                     }
-                );
+                ).unwrap();
 
 
                 // PyString::new(py, &format!("{}", &self)).into_object()
@@ -424,24 +424,24 @@ impl ToPyObject for Node{
             NodeClass::Comment => {
                 // PyTuple::new(py, &vec![]).into_object()
                 let d = PyDict::new(py);
-                d.set_item(py, "type", "comment");
+                d.set_item(py, "type", "comment").unwrap();
                 d.set_item(py, "text", match self.params {
                     Some(ref x) => {
                         x.get("txt").unwrap()
                     }
                     _ => ""
-                });
+                }).unwrap();
                 d.into_object()
             },
             NodeClass::Text => {
                 let d = PyDict::new(py);
-                d.set_item(py, "type", "text");
+                d.set_item(py, "type", "text").unwrap();
                 d.set_item(py, "text", match self.params {
                     Some(ref x) => {
                         x.get("txt").unwrap()
                     }
                     _ => ""
-                });
+                }).unwrap();
                 d.into_object()
             }
         }

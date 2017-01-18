@@ -77,29 +77,6 @@ named!(h2<Node>,
 );
 
 
-// named!(space_or_end,
-//        alt!(
-//            eof     |
-//            is_a_s!(" \r\n")
-//        )
-// );
-
-// fn right_bracket(c:char) -> bool {
-//   c == ']'
-// }
-
-// fn right_bracket_curly(c:char) -> bool {
-//     c == '}'
-// }
-// fn left_bracket_curly(c:char) -> bool {
-//     c == '{'
-// }
-// fn dot(c:char) -> bool {
-//     c == '.'
-// }
-
-
-
 named!(code<Node>,
        do_parse!(
            tag!("```") >>

@@ -1,33 +1,31 @@
+//! See https://docs.rs/url/1.2.4/url/
+
 use std::borrow::Cow;
-use nom::IResult;
-use std::fmt;
-// use super::article::node::{Node, NodeClass};
-use common::*;
 use std::str::from_utf8;
-use std::cell;
 
-// #[cfg(feature = "python")]
-// use cpython::{Python, ToPyObject, PyObject, PythonObject, PyTuple, PyString, PyResult, PyErr};
-
-
+/// HTML tag
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Tag<'a> {
+    /// `<!-- comment -->`
     Comment(Cow<'a, str>),
 }
 
 
-// An HTML comment consists of "<!--" + text + "-->", where text does
-// not start with ">" or "->", does not end with "-", and does not
-// contain "--". See the HTML5 spec:
-// https://www.w3.org/TR/html5/syntax.html#comments
-/// Comment
-named!(pub comment<Tag>,
-       do_parse!(
-           tag!( "<!--" ) >>
-           txt: map_res!(take_until!("-->"), from_utf8) >>
-           tag!( "-->" ) >>
-           (Tag::Comment(Cow::from(txt)))
-       )
+named_attr!(
+    #[doc = "HTML comment
+
+Consists of `<!--` + `text` + `-->`, where text does not start with `>`
+or `->`, does not end with `-`, and does not contain `--`. See the
+[HTML5 spec](https://www.w3.org/TR/html5/syntax.html#comments)
+
+"],
+    pub comment<Tag>,
+    do_parse!(
+        tag!( "<!--" ) >>
+        txt: map_res!(take_until!("-->"), from_utf8) >>
+        tag!( "-->" ) >>
+        (Tag::Comment(Cow::from(txt)))
+    )
 );
 
 
@@ -51,10 +49,8 @@ named!(pub comment<Tag>,
 #[cfg(test)]
 mod test {
     use super::*;
-    use nom::IResult::{Done, Incomplete, Error};
+    use nom::IResult::{Done};
     use std::collections::HashMap;
-    use std::str::from_utf8;
-    use common::*;
     use std::borrow::Cow;
 
     #[test]
