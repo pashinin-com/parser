@@ -43,7 +43,7 @@ setup(
     description='My parser for some things',
     author='Sergey Pashinin',
     author_email='sergey@pashinin.com',
-    url='https://github.com/pashinin-com/parser',
+    url='https://github.com/pashinin-com/rparser',
     requires=[],
     packages=['rparser'],
     distclass=RustDistribution,
@@ -86,6 +86,6 @@ setup(
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: Implementation :: CPython',
     ),
-    platforms = ["Windows", "Linux", "Mac OS-X"],
+    platforms=["Windows", "Linux", "Mac OS-X"],
     # platforms='any',
 )
