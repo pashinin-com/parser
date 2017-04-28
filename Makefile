@@ -32,8 +32,8 @@ py2:
 
 # .PHONY: build
 py3:
-	python3 setup.py build_rust
-	python3 setup.py build
+	python3.6 setup.py build_rust
+	python3.6 setup.py build
 
 install:
 	python setup.py build_rust
