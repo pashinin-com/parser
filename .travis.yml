@@ -120,6 +120,7 @@ deploy:
     password:
       secure: "t/CzlbFJSbjxY6AnzC6DKWGNtVjHR0vbTMde4efncw6StTzUWoG/INNng92KloQk9p73i1o1wAd2ZV3sZYh5QiGiN2u1SoeIaVY+vPQyphVpbCWLw9jVuEeSOJCbMM/zxE0xDayiGc6Oiy9nYLXFeLHMSiMDyJJZSzkrAefzoJN8J7P5IJ3hIQ4P177IHS9y4m8hWBWLjWwOoicAHZMoAweTf01kRDEdChsf7NKa7lIiQ563Wf9Z5QvJL+/qum/+yUwzz+I+PumuI6CfAMgifwX7JDjt9X351K6rUtWhu/K5zaqSFLbHfuP4LBSjsGDQG+PyK/6592DjpzzFxIE16mf9+WqJ0gBs1T4RKuv74PRJQjEg1X/IjOggRtv/o1/gIGHtiM3NR54FL7s6cQtYHAfbTvyM7lekR+QcYn4LoVEQTZKkVgAkKB5ukMZDeCdW1tPfc+ElRAbMBb35AIpD5wPvq67IApVYd5dP4ApAasFsEHHe3XYHW5SGrv7T/+wVgA1Dl/NxJp+Snh3lkT9wcziwTlg4ALMF9exqsZ5KQepbOUsvmRM8UEuyp2XJ7q3MnYUOciwFsuNIxhxNnOO0YA2R5M08XQrmqBFUJ+upDSBEZEFyqJtKo1BBr6CPoRVMFdK+AyM1uhwDJyO1FuARdYUfv9Yi8+jr0QPQ2ibDBuw="
     skip_cleanup: true
+    skip_upload_docs: true
     on:
       tags: true
       # repo: pashinin-com/parser
