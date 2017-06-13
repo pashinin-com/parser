@@ -9,7 +9,7 @@ known = []
 
 # This will fail because compiled .SO files go to /build dir.
 # You can symlink .SO file from /build to /rparser.
-from rparser import Markdown
+# from rparser import Markdown
 
 
 def render(folder, name):
@@ -18,8 +18,8 @@ def render(folder, name):
         content = f.read()
 
     html = ''
-    mm = Markdown(content)
-    html = mm.render()
+    # mm = Markdown(content)
+    # html = mm.render()
     # html = m.parse(content)
 
     filepath = os.path.join(folder, name + '.html')
@@ -46,13 +46,13 @@ def listdir(folder):
     return folder, names
 
 
-def test_extra():
-    folder, names = listdir('extra')
-    for key in names:
-        yield render, folder, key
+# def test_extra():
+#     folder, names = listdir('extra')
+#     for key in names:
+#         yield render, folder, key
 
 
-def test_normal():
-    folder, names = listdir('normal')
-    for key in names:
-        yield render, folder, key
+# def test_normal():
+#     folder, names = listdir('normal')
+#     for key in names:
+#         yield render, folder, key

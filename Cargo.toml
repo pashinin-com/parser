@@ -11,7 +11,7 @@ crate-type = ["dylib"]
 
 
 [dependencies]
-nom = "^2.0"
+nom = "^3.0"
 # pulldown-cmark = "*"
 
 # cpython = "0.1"

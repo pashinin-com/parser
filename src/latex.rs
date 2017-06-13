@@ -1,7 +1,7 @@
 //! LaTeX parser
 
-use std::collections::HashSet;
-use std::collections::HashMap;
+// use std::collections::HashSet;
+// use std::collections::HashMap;
 use std::convert::From;
 use std::borrow::Cow;
 

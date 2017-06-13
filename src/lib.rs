@@ -22,7 +22,7 @@ extern crate nom;
 
 pub mod common;
 pub mod article;
-pub mod latex;
+// pub mod latex;
 // pub mod markdown;
 pub mod html;
 

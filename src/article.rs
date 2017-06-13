@@ -2,15 +2,50 @@
 //! let mut p = Article::from("[[page 1 | text]]");
 //! ```
 
+// #![cfg(feature = "stream")]
+
 use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::borrow::Cow;
 use std::collections::HashSet;
 use std::collections::HashMap;
-use nom::{eol, IResult};
+use nom::{eol, IResult, not_line_ending};
 use std::str::from_utf8;
 use common::*;
+use html;
+use html::tag;
 use std::convert::From;
+use nom::{Consumer,ConsumerState,Move,Input,Producer,MemProducer};
+use nom::Offset;
+
+
+// allowed_html_tags = HashMap::new();
+// allowed_html_tags.insert(Cow::from("table"));
+
+
+const ALLOWED_HTML_TAGS: [&'static str; 3] = [
+    "table",
+    "tr",
+    "td"
+];
+
+#[derive(PartialEq,Eq,Debug)]
+enum State {
+    Beginning,
+    // Middle,
+    // End,
+    Done,
+    Error
+}
+
+struct TestConsumer<'a> {
+    tags:    Vec<Tag<'a>>,
+    state:   State,
+    c_state: ConsumerState<usize,(),Move>,
+    counter: usize,
+    line: usize,
+    col: usize
+}
 
 #[cfg(feature = "python")]
 use cpython::{Python, PythonObject, PyObject, ToPyObject, PyTuple, PyString, PyResult, PyDict};
@@ -27,7 +62,11 @@ pub enum Tag<'a> {
         // Cow<'a, str>
         Vec<Tag<'a>>  // contents of list item
     ),
+    ListNumbered(Vec<Tag<'a>>),
+    ListItemNumbered(Vec<Tag<'a>>),
     Header(usize, Cow<'a, str>),
+
+    CodeTabs(Vec<Tag<'a>>),
     Code(
         Cow<'a, str>,   // language
         Cow<'a, str>    // source code
@@ -39,6 +78,9 @@ pub enum Tag<'a> {
         query: Cow<'a, str>,
     },
     Text(Cow<'a, str>),
+    HTMLTag(html::HTMLTag<'a>),
+    MathInline(Cow<'a, str>),
+    MathWholeLine(Cow<'a, str>),
     Comment,
     LinkInternal{page: Cow<'a, str>, text: Cow<'a, str>, link: Option<Cow<'a, str>>},
 
@@ -51,7 +93,157 @@ pub enum Tag<'a> {
     },
 
     Space,
+    // Cut
 }
+
+impl<'a> TestConsumer<'a> {
+
+}
+
+
+impl<'a> Consumer<&'a[u8], usize, (), Move> for TestConsumer<'a> {
+    fn state(&self) -> &ConsumerState<usize,(),Move> {
+        &self.c_state
+    }
+
+    fn handle(&mut self, input: Input<&'a [u8]>) -> &ConsumerState<usize,(),Move> {
+        // println!("input: {:?}", input);
+        match self.state {
+            State::Beginning => {
+                match input {
+                    // if there is no more data
+                    Input::Empty | Input::Eof(None) => {
+                        self.state   = State::Error;
+                        self.c_state = ConsumerState::Error(());
+                    },
+                    Input::Element(sl) | Input::Eof(Some(sl)) => {
+                        let block;
+                        if self.col == 0{
+                            block = line_start_element(sl);
+                        }else{
+                            block = element(sl);
+                        }
+
+                        match block {
+                            IResult::Error(_)      => {
+                                // self.state   = State::Error;
+                                // self.c_state = ConsumerState::Error(());
+                                self.state   = State::Done;
+                                self.c_state = ConsumerState::Done(Move::Consume(0), self.counter);
+                            },
+                            IResult::Incomplete(_) => {
+                                // self.c_state = ConsumerState::Continue(Move::Await(n));
+                                self.state   = State::Done;
+                                self.c_state = ConsumerState::Done(Move::Consume(0), self.counter);
+                            },
+                            IResult::Done(i, tag)     => {
+                                // println!("Got {:?}", tag);
+                                // println!("moving: {:?}", sl.offset(i));
+                                // println!("parsed: {:?}", &sl[0..sl.offset(i)]);
+                                if tag != Tag::Space{
+                                    self.tags.push(tag);
+                                }
+
+                                // println!("EOLS: {:?}", &sl[0..sl.offset(i)]);
+                                // println!("EOLS: {:?}", count_eols(&sl[0..sl.offset(i)]));
+
+                                // Count EOLs (end-of-lines) in a parsed block,
+                                // detect current line position (column)
+                                match count_eols(&sl[0..sl.offset(i)]) {
+                                    IResult::Error(_)      => {},
+                                    IResult::Incomplete(_) => {},
+                                    IResult::Done(rest, eols) => {
+                                        self.line += eols;
+                                        if eols > 0 {
+                                            self.col = rest.len()
+                                        } else {
+                                            self.col = rest.len() + sl.offset(i)
+                                        }
+                                    },
+                                }
+
+                                // self.state = State::Middle;
+                                self.c_state = ConsumerState::Continue(Move::Consume(sl.offset(i)));
+                            }
+                        }
+                    }
+                }
+            },
+            // State::Middle    => {
+            //     match input {
+            //         // if there is no more data
+            //         Input::Empty | Input::Eof(None) => {
+            //             self.state   = State::Error;
+            //             self.c_state = ConsumerState::Error(());
+            //         },
+            //         Input::Element(sl) | Input::Eof(Some(sl)) => {
+            //             match root_element(sl) {
+            //                 IResult::Error(_)      => {
+            //                     // println!("Middle error, {:?} tags now", self.tags.len());
+            //                     // self.state   = State::End;
+            //                     // self.c_state = ConsumerState::Continue(Move::Consume(0));
+
+            //                     self.state   = State::Done;
+            //                     self.c_state = ConsumerState::Done(Move::Consume(0), self.counter);
+            //                 },
+            //                 IResult::Incomplete(n) => {
+            //                     println!("Middle got Incomplete({:?})", n);
+            //                     self.c_state = ConsumerState::Continue(Move::Await(n));
+
+            //                     // self.state = State::Done;
+            //                     // self.c_state = ConsumerState::Done(Move::Consume(0), ());
+
+            //                     // self.state   = State::Done;
+            //                     // self.c_state = ConsumerState::Done(Move::Consume(sl.offset(i)), self.counter);
+            //                 },
+            //                 IResult::Done(i, tag)     => {
+            //                     println!("Got {:?}", tag);
+            //                     self.tags.push(tag);
+            //                     println!("EOLS: {:?}", &sl[0..sl.offset(i)]);
+            //                     println!("EOLS: {:?}", count_eols(&sl[0..sl.offset(i)]));
+            //                     // self.counter = self.counter + noms_vec.len();
+            //                     self.state = State::Middle;
+            //                     self.c_state = ConsumerState::Continue(Move::Consume(sl.offset(i)));
+            //                 }
+            //             }
+            //         }
+            //     }
+            // },
+            // State::End       => {
+            //     match input {
+            //         // if there is no more data
+            //         Input::Empty | Input::Eof(None) => {
+            //             self.state   = State::Error;
+            //             self.c_state = ConsumerState::Error(());
+            //         },
+            //         Input::Element(sl) | Input::Eof(Some(sl)) => {
+            //             match root_element(sl) {
+            //                 IResult::Error(_)      => {
+            //                     self.state   = State::Error;
+            //                     self.c_state = ConsumerState::Error(());
+            //                 },
+            //                 IResult::Incomplete(n) => {
+            //                     self.c_state = ConsumerState::Continue(Move::Await(n));
+            //                 },
+            //                 IResult::Done(i, tag)     => {
+            //                     self.tags.push(tag);
+            //                     self.state = State::Done;
+            //                     self.c_state = ConsumerState::Done(Move::Consume(sl.offset(i)), self.counter);
+            //                 }
+            //             }
+            //         }
+            //     }
+            // },
+            State::Done | State::Error     => {
+                // this should not be called
+                self.state = State::Error;
+                self.c_state = ConsumerState::Error(())
+            }
+        };
+        &self.c_state
+    }
+}
+
 
 
 // impl<'a> Display for N<Tag<'a>> {
@@ -273,14 +465,14 @@ impl<'a> ToPyObject for Tag<'a> {
 #[cfg(feature = "python")]
 pub fn article_render<'a>(py: Python, args: &PyTuple, kwargs: Option<&PyDict>) -> PyResult<PyTuple> {
     let source = args.get_item(py, 0).to_string();
-    let mut p = Article::from(source.as_bytes());
+    let mut a = Article::from(source.as_bytes());
     if let Some(kwargs) = kwargs {
-        p.set_info_from_pydict(py, kwargs);
+        a.set_info_from_pydict(py, kwargs);
     }
 
     Ok(PyTuple::new(py, &[
-        PyString::new(py, &p.html).into_object(),
-        p.py_info(py).into_object()
+        PyString::new(py, &a.html).into_object(),
+        a.py_info(py).into_object()
     ]))
 }
 
@@ -295,11 +487,15 @@ pub struct Article<'a> {
 }
 
 impl<'a> Article<'a> {
+
     /// Get some information about current article.
     /// Return a PyDict like:
     /// {
     ///   "missing_links": ("page name 1", "page name 2", ...)
     /// }
+    ///
+    /// What information is returned:
+    ///
     #[cfg(feature = "python")]
     pub fn py_info(&self, py: Python) -> PyDict {
         let info = PyDict::new(py);
@@ -332,10 +528,34 @@ impl<'a> Article<'a> {
     }
 
     fn render(&mut self) {
-        self.html = match parse(self.src) {
-            IResult::Done(_, tag) => Cow::from(format!("{}", tag.to_html(self))),
-            _ => Cow::from("")
+        // let mut p = MemProducer::new(&b"omnomkthxbye"[..], 8);
+        let mut p = MemProducer::new(&self.src, 256);
+        let mut c = TestConsumer{
+            state: State::Beginning,
+            counter: 0,
+            c_state: ConsumerState::Continue(Move::Consume(0)),
+            tags: vec![],
+            line: 1,
+            col: 0
         };
+        while let &ConsumerState::Continue(Move::Consume(_)) = p.apply(&mut c) {
+            // println!("move: {:?}", mv);
+        }
+        // println!("last consumer state: {:?} | last state: {:?}", c.c_state, c.state);
+        // println!("Total lines: {:?}", c.line);
+        // println!("Current column: {:?}", c.col);
+
+        // if let ConsumerState::Done(Move::Consume(0), 0) = c.c_state {
+        //     println!("consumer state ok");
+        // } else {
+        //     assert!(false, "consumer should have reached Done state");
+        // }
+
+        self.html = Cow::from(format!("{}", c.tags.to_html(self)));
+        // self.html = match parse(self.src) {
+        //     IResult::Done(_, parsed_data) => Cow::from(format!("{}", parsed_data.to_html(self))),
+        //     _ => Cow::from("")
+        // };
     }
 }
 
@@ -396,6 +616,7 @@ impl<'a> ToHtml for Tag<'a> {
     fn to_html(&self, parser: &mut Article) -> Cow<str>
     {
         match *self {
+
             Tag::Container{ref c} => c.to_html(parser),
             // {
             //     let children_strings: Vec<Cow<str>> = c.iter()
@@ -464,8 +685,31 @@ impl<'a> ToHtml for Tag<'a> {
                 }
             },
             Tag::Text(ref txt) => txt.clone(),
+            Tag::MathInline(ref text) => Cow::from(format!("\\({0}\\)", text)),
+            Tag::MathWholeLine(ref text) => Cow::from(format!("\\[{0}\\]", text)),
+
             Tag::Header(ref level, ref text) => Cow::from(format!("<h{0}>{1}</h{}>", level, text)),
 
+            // Tag::ListNumbered{ref c} => {
+            //     Cow::from(format!("List NUMBERED:<br><ul>{}</ul>", c.to_html(parser)))
+            // },
+            Tag::HTMLTag(ref tag) => {
+                // let parts: Vec<Cow<str>> = items.iter()
+                //     .map(|&ref x| x.to_html(parser))
+                //     .collect();
+                if ALLOWED_HTML_TAGS.iter().any(|v| v == &tag.name) {
+                    Cow::from(format!("{}", tag))
+                } else {
+                    Cow::from(format!("&lt;{}&gt;", tag.name))
+                }
+            },
+
+            Tag::ListNumbered(ref items) => {
+                let parts: Vec<Cow<str>> = items.iter()
+                    .map(|&ref x| x.to_html(parser))
+                    .collect();
+                Cow::from(format!("<ol>{}</ol>", parts.join("")))
+            },
 
             Tag::ListUnnumbered{ref c} => {
                 // let items: Vec<Cow<str>> = c.iter()
@@ -491,34 +735,41 @@ impl<'a> ToHtml for Tag<'a> {
                     .collect();
                 Cow::from(format!("<li>{}</li>", parts.join(" ")))
             },
+            Tag::ListItemNumbered(ref words) => {
+                let parts: Vec<Cow<str>> = words.iter()
+                    .map(|&ref x| x.to_html(parser))
+                    .collect();
+                Cow::from(format!("<li>{}</li>", parts.join(" ")))
+            },
 
             Tag::Code(ref lng, ref code) => Cow::from(format!("<pre><code class=\"{}\">{}</code></pre>", lng, code)),
+
+            // css tabs
+            // https://codepen.io/wallaceerick/pen/ojtal
+            Tag::CodeTabs(ref code_blocks) => {
+                if code_blocks.len() == 1 {
+                    code_blocks[0].to_html(parser)
+                } else {
+                    let parts: Vec<Cow<str>> = code_blocks.iter()
+                        .map(|&ref x| x.to_html(parser))
+                        .collect();
+
+                    Cow::from(format!(
+                        "<ul class=\"tabs\" role=\"tablist\"><li>{}</li></ul>",
+                        parts.join("</li><li>")
+                    ))
+                }
+                // let parts: Vec<Cow<str>> = code_blocks.iter()
+                //     .map(|&ref x| x.to_html(parser))
+                //     .collect();
+                // Cow::from(format!("<li>{}</li>", parts.join(" ")))
+                // Cow::from(format!("<pre><code class=\"{}\">{}</code></pre>", lng, code)),
+            }
             Tag::Comment => Cow::from(""),
             Tag::Space => Cow::from(" "),
         }
     }
 }
-
-
-
-
-
-/// Paragraphs are separated with 2 new lines with any number of spaces
-/// between, before and after them.
-// named!(pub paragraph_separator,
-//        complete!(
-//            recognize!(
-//                chain!(
-//                    opt!(take_while!(space_but_not_eol)) ~
-//                        eol ~
-//                        opt!(take_while!(space_but_not_eol)) ~
-//                        eol ~
-//                        opt!(take_while!(any_space)),
-//                    || {}
-//                )
-//            )
-//        )
-// );
 
 
 /// Comment
@@ -533,35 +784,46 @@ named!(comment<Tag>,
 
 
 named!(list_item_word<Tag>,
-       do_parse!(
-           block: alt_complete!(
-               internal_link |
-               external_link |
-               url |
-               comment |
-               symbols
-           ) >>
-           (block)
+       alt_complete!(
+           internal_link |
+           external_link |
+           url |
+           comment |
+           symbols
        )
 );
 
 named!(pub list_item_words<Tag>,
        do_parse!(
+           w: list_item_word >>
            words: many1!(list_item_word) >>
-           (Tag::Container{c: words})
+           ({
+               let mut v = words;
+               v.insert(0, w);
+               Tag::Container{c: v}
+           })
        )
+);
+
+named!(pub cut,
+       tag!(">---")
 );
 
 named!(
     list_item_content<Vec<Tag>>,
-    separated_list!(
-        // word_separator,
-        // take_while!(space_but_not_eol),
-        space_not_eol,
-        alt_complete!(
-            list_item_words |
-            list_item_word
-        )
+    do_parse!(
+        // opt!(space_not_eol) >>
+        content: separated_nonempty_list!(
+            complete!(space_not_eol),
+            complete!(
+                alt_complete!(
+                    list_item_words |
+                    list_item_word
+                )
+            )
+        ) >>
+        opt!(space_not_eol) >>
+        (content)
     )
 );
 
@@ -582,7 +844,7 @@ named_attr!(
         words: list_item_content >>
         // opt!(map_res!(is_not!( "\r\n" ), from_utf8)) >>
 
-        opt!(space_not_eol) >>
+        // opt!(space_not_eol) >>
         // (Tag::ListUnnumberedItem(Cow::from(txt)))
         // (Tag::Text(Cow::from(txt)))
         ({
@@ -593,9 +855,76 @@ named_attr!(
     )
 );
 
+named_attr!(
+    #[doc = "Numbered list item: `#. Item 1`
+
+An item from such list:
+
+```text
+#. item 1
+#.#. item 1.1
+#. item 2
+```
+"],
+    pub list_numbered_item<Tag>,
+    // pub list_unnumbered_item<Vec<Tag>>,
+
+    do_parse!(
+        many1!(tag!( "#." )) >>
+        tag!( " " ) >>
+        // opt!(space_not_eol) >>
+        // txt: map_res!(is_not!( "\r\n" ), from_utf8) >>
+        // words: map_res!(not_line_ending, from_utf8) >>
+        words: list_item_content >>
+        // opt!(map_res!(is_not!( "\r\n" ), from_utf8)) >>
+        // opt!(space_not_eol) >>
+        // opt!(not_line_ending) >>
+        alt_complete!(
+            eol |
+            eof!()
+        ) >>
+
+        // (Tag::ListUnnumberedItem(Cow::from(txt)))
+        // (Tag::Text(Cow::from(txt)))
+        ({
+            // if (words.len() = 1 )
+            Tag::ListItemNumbered(
+                // vec![
+                //     Tag::Text(Cow::from(words))
+                // ]
+                words
+            )
+        })
+        // (words)
+    )
+);
+
 
 named_attr!(
-    #[doc = "Unnumbered list: * item1 * item2
+    #[doc = "Numbered list
+
+```text
+#. item 1
+#.#. item 1.1
+#. item 2
+```
+"],
+    pub list_numbered<Tag>,
+    do_parse!(
+        // items: separated_nonempty_list!(complete!(tag!("")), complete!(list_numbered_item)) >>
+        // items: separated_nonempty_list!(complete!(eol), complete!(list_numbered_item)) >>
+        // items: separated_list!(complete!(space_max1eol), list_unnumbered_item) >>
+        // items: separated_list!(space_max1eol, list_unnumbered_item) >>
+        // take_while!(any_space) >>
+        // items: separated_list!(eol, map_res!(is_not!( "\r\n" ), from_utf8)) >>
+        items: many1!(list_numbered_item) >>
+        (Tag::ListNumbered(items))
+    )
+);
+
+
+named_attr!(
+    #[doc = "Unnumbered list
 
 ```
 * item1
@@ -603,7 +932,7 @@ named_attr!(
 ```"],
     pub list_unnumbered<Tag>,
     do_parse!(
-        // items: separated_list!(space_max1_eol, list_unnumbered_item) >>
+        // items: separated_list!(space_max1eol, list_unnumbered_item) >>
         // take_while!(any_space) >>
         // items: separated_list!(eol, map_res!(is_not!( "\r\n" ), from_utf8)) >>
         items: many1!(list_unnumbered_item) >>
@@ -613,16 +942,82 @@ named_attr!(
 
 
 named_attr!(
-    #[doc = "Header
-`# h1`
-`## h2`
-`### h3`"],
-    header<Tag>,
+    #[doc = "Parse headers (Markdown style, ex.: `## Header 2`)
+
+```text
+# Header 1
+## Header 2
+### Header 3
+#### Header 4
+##### Header 5
+###### Header 6
+```"],
+    pub header<Tag>,
     do_parse!(
         level: many1!(tag!( "#" )) >>
         opt!(space_not_eol) >>
         txt: map_res!(is_not!( "\r\n" ), from_utf8) >>
         (Tag::Header(level.len(), Cow::from(txt)))
+    )
+);
+
+
+named_attr!(
+    #[doc = "Parse inline math formula (Latex style, ex.: `\\( ... \\)`)
+
+Not using Tex-style `$ ... $`. Easier to work with and parse Latex style formulas.
+
+```text
+\\(a+b\\)    inline formulas
+\\[a+b\\]    separate line formulas
+```
+"],
+    pub inline_formula<Tag>,
+    do_parse!(
+        tag!( "\\(" ) >>
+        // opt!(space_not_eol) >>
+        txt: map_res!(take_until!("\\)"), from_utf8) >>
+        tag!( "\\)" ) >>
+        (Tag::MathInline(Cow::from(txt)))
+    )
+);
+
+
+named_attr!(
+    #[doc = "Parse separate math formula (Latex style, ex.: `\\[ ... \\]`)
+
+Not using Tex-style `$ ... $`. Easier to work with and parse Latex style formulas.
+
+```text
+\\(a+b\\)    inline formulas
+\\[a+b\\]    separate line formulas
+```
+"],
+    pub separate_formula<Tag>,
+    do_parse!(
+        tag!( "\\[" ) >>
+        opt!(space_not_eol) >>
+        // txt: map_res!(is_not!( "\r\n" ), from_utf8) >>
+        txt: map_res!(take_until!("\\]"), from_utf8) >>
+        tag!( "\\]" ) >>
+        (Tag::MathWholeLine(Cow::from(txt)))
+    )
+);
+
+named_attr!(
+    #[doc = "Parse math formula (Latex style)
+
+Not using Tex-style `$ ... $`. Easier to work with and parse Latex style formulas.
+
+```text
+\\(a+b\\)    inline formulas
+\\[a+b\\]    separate line formulas
+```
+"],
+    pub math_formula<Tag>,
+    alt_complete!(
+        inline_formula |
+        separate_formula
     )
 );
 
@@ -647,6 +1042,32 @@ named_attr!(
                 _ => Cow::from(language)
             },
             Cow::from(code)))
+        // (params.iter().fold(
+        //         HashMap::new(),
+        //         |mut T, tuple| {T.insert(tuple.0, tuple.1); T})
+        // )
+    )
+);
+
+named_attr!(
+    #[doc = "Several code blocks (as tabs)
+
+Defined just as several code blocks without any blank lines between
+them.
+
+```
+
+```
+"],
+    pub code_tabs<Tag>,
+    do_parse!(
+        codes: separated_nonempty_list!(
+            complete!(eol),
+            complete!(
+                code
+            )
+        ) >>
+        (Tag::CodeTabs(codes))
         // (params.iter().fold(
         //         HashMap::new(),
         //         |mut T, tuple| {T.insert(tuple.0, tuple.1); T})
@@ -723,39 +1144,59 @@ named!(pub url<Tag>,
 );
 
 /// Main parser function
-named!(pub parse<Tag>,
+named!(pub parse<Vec<Tag>>,
     do_parse!(
         opt!(take_while!(any_space)) >>
-        pars: separated_list!(space_min_2eol, root_element) >>
+        pars: separated_list!(complete!(space_min2eol), complete!(root_element)) >>
         opt!(take_while!(any_space)) >>
-        (Tag::Container{c:pars})
+        // (Tag::Container{c:pars})
+        (pars)
     )
 );
 
+
+named_attr!(
+    #[doc = "Element that go only from line start"],
+    line_start_element<Tag>,
+    alt_complete!(
+        code_tabs |
+        complete!(list_numbered) |
+        html_tag |
+        header |
+        paragraph |
+        space_tag
+    )
+);
+
+
+named_attr!(
+    #[doc = "Elements that go NOT only from line start"],
+    element<Tag>,
+    alt_complete!(
+        code_tabs |
+        html_tag |
+        paragraph |
+        space_tag
+    )
+);
+
+
 named!(root_element<Tag>,
-       do_parse!(
-           block: alt_complete!(
-               list_unnumbered |
-               paragraph
-           ) >>
-           (block)
+       alt_complete!(
+           // list_unnumbered |
+           complete!(list_numbered) |
+           // paragraphs |
+           paragraph |
+           space_tag
        )
 );
 
-
-named!(word_separator<Tag>,
-       // recognize!(
-           complete!(
-               do_parse!(
-                   opt!(take_while!(space_but_not_eol)) >>
-                   opt!(eol) >>
-                   opt!(take_while!(space_but_not_eol)) >>
-                   (Tag::Space)
-               )
-           )
-       // )
+named!(space_tag<Tag>,
+       do_parse!(
+           txt: take_while1!(any_space) >>
+           (Tag::Space)
+       )
 );
-
 
 named!(symbols<Tag>,
        do_parse!(
@@ -764,59 +1205,47 @@ named!(symbols<Tag>,
        )
 );
 
+named!(html_tag<Tag>,
+       do_parse!(
+           // t:tag!("asd") >>
+           t: tag >>
+           (Tag::HTMLTag(t))
+               // (Tag::Space)
+       )
+);
+
 named!(
     word<Tag>,
-    do_parse!(
-        block: alt_complete!(
-            // words |
-            // many1!(word) => {|x| Tag::Comment} |
-            code |
-            header |
-            internal_link |
-            external_link |
-            url |
-            comment |
-            // list_unnumbered |
-            symbols
-            // word_separator
-        ) >>
-        (block)
+    alt_complete!(
+        // words |
+        // many1!(word) => {|x| Tag::Comment} |
+        // list_numbered |
+        // code |
+        // header |
+        internal_link |
+        external_link |
+        url |
+        comment |
+        html_tag |
+        // list_unnumbered |
+
+        symbols               // any text
+        // word_separator
     )
 );
 
-// named!(words<Vec<Tag>>,
 named!(words<Tag>,
        do_parse!(
            w: word >>
            words: many1!(word) >>
-           // vec.extend([1, 2, 3].iter().cloned());
            ({
                let mut v = words;
                v.insert(0, w);
-               // v
                Tag::Container{c: v}
-               // Tag::Container{c: words}
            })
        )
 );
 
-// named!(p1<Tag>,
-//        do_parse!(
-//            words: many1!(word) >>
-//            (Tag::Container{c: words})
-//        )
-// );
-// named!(p2<Tag>,
-//        do_parse!(
-//            words: separated_list!(space_max1_eol, word) >>
-//            (Tag::Container{c: words})
-//        )
-// );
-
-// fold_many1!( tag!( "abcd" ), Vec::new(), |mut acc: Vec<_>, item| {
-//      acc.push(item);
-//      acc
-//  })
 named_attr!(
     #[doc = "Paragraph
 
@@ -830,21 +1259,15 @@ named_attr!(
 "],
     pub paragraph<Tag>,
     do_parse!(
-        words: separated_list!(
-            space_max1_eol,
+        words: separated_nonempty_list!(
+            complete!(space_max1eol),
             alt_complete!(
-                words |     // if no space between for example link and text
-                word
+                words |     // 2 "words" with no space between them
+                word        // single "word"
             )
-            // word
         ) >>
+        // opt!(space_min2eol) >>
            // words: many1!(word) >>
-
-           // words: many1!(alt_complete!(
-           //     p1 |
-           //     p2
-           // )) >>
-
            // , Vec::new(), |mut acc: Vec<_>, item| {
            // ), Vec::new(), |mut acc: Vec<_>, item| {
            //     // match item {
@@ -858,8 +1281,21 @@ named_attr!(
            //     acc.push(item);
            //     acc
            // )) >>
-           (Tag::Paragraph{c: words})
+        (Tag::Paragraph{c: words})
        )
+);
+
+named_attr!(
+    #[doc = "Paragraphs"],
+    pub paragraphs<Tag>,
+    do_parse!(
+        pars: separated_nonempty_list!(
+            complete!(space_min2eol),
+            complete!(paragraph)
+            // word
+        ) >>
+        (Tag::Container{c: pars})
+    )
 );
 
 
@@ -867,11 +1303,11 @@ named_attr!(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use nom::IResult::{Done, Incomplete, Error};
+    use nom::IResult::{Done};
     use std::collections::HashMap;
     // use super::super::node::Tag;
-    use std::str::from_utf8;
-    use common::*;
+    // use std::str::from_utf8;
+    // use common::*;
     use std::borrow::Cow;
 
     // #[test]
@@ -912,18 +1348,78 @@ mod tests {
     }
 
     #[test]
-    fn test_hostname() {
+    fn test_listitem_numbered() {
         let mut tests = HashMap::new();
+        // tests.insert(
+        //     &b"#. txt"[..],
+        //     Done(&b""[..],
+        //          Tag::ListItemNumbered(
+        //              vec![
+        //                  Tag::Container{
+        //                      c: vec![Tag::Text(Cow::from("txt"))]
+        //                  }
+
+        //              ]
+        //          )
+        //     )
+        // );
         tests.insert(
-            &b"host.pashinin.com"[..],
-            Done(&b""[..], "host.pashinin.com".as_bytes())
-        );
-        tests.insert(
-            &b"sub.www.youtube.com"[..],
-            Done(&b""[..], "sub.www.youtube.com".as_bytes())
+            &b"#.#. txt\n"[..],
+            Done(&b""[..],
+                 Tag::ListItemNumbered(
+                     vec![
+                         Tag::Text(Cow::from("txt"))
+                     ]
+                 )
+            )
         );
         for (input, expected) in &tests {
-            assert_eq!(hostname(input), *expected);
+            assert_eq!(list_numbered_item(input), *expected);
+        }
+    }
+
+    #[test]
+    fn test_list_numbered() {
+        let mut tests = HashMap::new();
+
+        // List from 1 item
+        tests.insert(
+            &b"#. item1"[..],
+            Done(&b""[..],
+                 Tag::ListNumbered(vec![
+                     Tag::ListItemNumbered(vec![Tag::Text(Cow::from("item1"))]),
+                 ])
+            )
+        );
+
+        // List from 2 items
+        tests.insert(
+            &b"#. item1\n#. item2"[..],
+            Done(&b""[..],
+                 Tag::ListNumbered(vec![
+                     Tag::ListItemNumbered(vec![Tag::Text(Cow::from("item1"))]),
+                     Tag::ListItemNumbered(vec![Tag::Text(Cow::from("item2"))])
+                 ])
+            )
+        );
+        for (input, expected) in &tests {
+            assert_eq!(list_numbered(input), *expected);
+        }
+    }
+
+    #[test]
+    fn test_formula() {
+        let mut tests = HashMap::new();
+        tests.insert(
+            &b"\\( a + b \\)"[..],
+            Done(&b""[..], Tag::MathInline(Cow::from(" a + b ")))
+        );
+        tests.insert(
+            &b"\\[ a + b \\]"[..],
+            Done(&b""[..], Tag::MathWholeLine(Cow::from("a + b ")))
+        );
+        for (input, expected) in &tests {
+            assert_eq!(math_formula(input), *expected);
         }
     }
 
@@ -1019,75 +1515,120 @@ mod tests {
     // }
 
     #[test]
-    fn test_url_query_params() {
+    fn test_list_item_content(){
         let mut tests = HashMap::new();
-        // key=value & key2=value2
+        tests.insert("123 ", Done(&b""[..], vec![
+            Tag::Text(Cow::from("123"))
+        ]));
+
+        for (input, expected) in tests {
+            assert_eq!(
+                list_item_content(input.as_bytes()),
+                expected);
+        }
+    }
+
+    #[test]
+    fn test_code_tabs(){
+        let mut tests = HashMap::new();
         tests.insert(
-            &b"gfe_rd=cr&ei=zCZLWNPMHceAuAH2-oCYDw&gws_rd=ssl#newwindow=1&q=url+query+string"[..],
-            Done(&b""[..], vec![
-                ("gfe_rd", "cr"),
-                ("ei", "zCZLWNPMHceAuAH2-oCYDw"),
-                ("gws_rd", "ssl#newwindow=1"),
-                ("q", "url+query+string"),
-            ])
+            "```pascal\nvar x: integer;\n```\n```cpp\nint x=1;\n``` ",
+            Done(&b" "[..],
+                 Tag::CodeTabs(vec![
+                     Tag::Code(Cow::from("pascal"), Cow::from("var x: integer;\n")),
+                     Tag::Code(Cow::from("cpp"), Cow::from("int x=1;\n"))
+                 ])
+        ));
+
+        for (input, expected) in tests {
+            assert_eq!(
+                code_tabs(input.as_bytes()),
+                expected);
+        }
+    }
+
+    #[test]
+    fn test_render() {
+        let mut tests = HashMap::new();
+        // tests.insert("* 123 \n* asd ", "<ul><li>123</li><li>asd</li></ul>");
+        tests.insert("1", "<p>1</p>");
+        tests.insert("1 2", "<p>1 2</p>");
+        tests.insert("  1  \n\n 2  ", "<p>1</p><p>2</p>");
+
+        // This is not a header (a line starts from a space symbol)
+        tests.insert(" # Header (no)", "<p># Header (no)</p>",);
+
+        // Numbered list, 1 item:
+        tests.insert("#. 123", "<ol><li>123</li></ol>");
+        // Numbered list, 2 items:
+        tests.insert("#. 123\n#. asd", "<ol><li>123</li><li>asd</li></ol>");
+        // Numbered list, 2 items, space in the end:
+        tests.insert("#. 123\n#. asd ", "<ol><li>123</li><li>asd</li></ol>");
+
+        // for (input, expected) in &tests {assert_eq!(parse(input), *expected);}
+
+        //
+        // HTML tags
+        //
+        // Forbidden tags: <script> <iframe> and everything except
+        // allowed tags
+        tests.insert("<script >", "&lt;script&gt;");
+        tests.insert("<table><tr><td>", "<table><tr><td>");
+        // tests.insert("<i>italics</i>", "<table><tr><td>");
+
+
+        // code tabs
+        // 1 code block
+        tests.insert(
+            "```pascal\nvar x: integer;\n```",
+            "<pre><code class=\"pascal\">var x: integer;\n</code></pre>"
         );
 
-        // test a key without a value:  /path?param
-        // param   -  ("param", "")
+        // 2 tabs
         // tests.insert(
-        //     &b"key"[..],
-        //     Done(&b""[..], vec![
-        //         ("key", ""),
-        //     ])
+        //     "```pascal\nvar x: integer;\n```\n```cpp\nint x=1;\n```",
+        //     "<table><tr><td>"
         // );
-
-        // tests.insert(&b""[..], Done(&b""[..], vec![]));
-        for (input, expected) in &tests {assert_eq!(url_query_params(input), *expected);}
-    }
-
-
-    #[test]
-    fn test_url_query_params1() {
-        // key=value
-        // key
-        let mut tests = HashMap::new();
-        tests.insert(&b"key=value"[..], Done(&b""[..], ("key", "value")));
-        tests.insert(&b"key"[..], Done(&b""[..], ("key", "")));
-        // tests.insert(&b"key="[..], Incomplete(Needed::Size(4)));
-        tests.insert(&b"key="[..], Done(&b""[..], ("key", "")));
-        for (input, expected) in &tests {assert_eq!(url_query_params1(input), *expected);}
-    }
-
-    #[test]
-    fn test_url_query() {
-        // let mut tests = HashMap::new();
-        // tests.insert(
-        //     &b"?d=1"[..],
-        //     Done(&b""[..], HashMap::new().insert("d", "1"))
-        // );
-        // tests.insert(&b""[..], Done(&b""[..], vec![]));
-        // for (input, expected) in &tests {assert_eq!(url_query(input), *expected);}
-    }
-
-    #[test]
-    fn test_parse() {
-        let mut tests = HashMap::new();
-        tests.insert("* 123 \n* asd ", "<ul><li>123</li><li>asd</li></ul>");
-        tests.insert("1", "<p>1</p>",);
-        tests.insert("1 2", "<p>1 2</p>",);
-        tests.insert("1 \n\n 2", "<p>1</p><p>2</p>",);
-        // for (input, expected) in &tests {assert_eq!(parse(input), *expected);}
 
 
         for (input, expected) in tests {
-            let mut p = Article::from(input);
+            let a = Article::from(input);
             // let r = match parse(input) {
             //     Done(_, tag) => {tag.to_html(&)},
             //     _ => "error".to_string()
             // };
             // assert_eq!(parse(input.as_bytes()), Done(&b""[..], Tag::Space));
-            assert_eq!(p.html, *expected);
+            assert_eq!(a.html, *expected);
         }
+    }
+
+    #[test]
+    #[ignore]
+    fn test_parse() {
+        let mut tests = HashMap::new();
+        tests.insert(
+            &b"1"[..],
+            Done(&b""[..], vec![
+                    Tag::Paragraph {
+                        c: vec![Tag::Text(Cow::from("1"))]
+                    }
+                ]
+            )
+        );
+
+        // Numbered list with space after it
+        tests.insert(
+            &b"#. item1\n#. item2"[..],
+            Done(&b""[..], vec![
+                Tag::ListNumbered(
+                    vec![
+                        Tag::ListItemNumbered(vec![Tag::Text(Cow::from("item1"))]),
+                        Tag::ListItemNumbered(vec![Tag::Text(Cow::from("item2"))]),
+                    ]
+                )
+            ])
+        );
+        for (input, expected) in &tests {assert_eq!(parse(input), *expected);}
     }
 }
 
@@ -1096,17 +1637,17 @@ mod tests {
 #[cfg(test)]
 mod test {
     use super::*;
-    use nom::IResult::{Done, Incomplete, Error};
+    // use nom::IResult::{Done, Incomplete, Error};
     use std::collections::HashMap;
-    use std::str::from_utf8;
-    use common::*;
+    // use std::str::from_utf8;
+    // use common::*;
     use std::borrow::Cow;
 
     #[test]
     fn parser() {
         let mut map = HashMap::new();
         map.insert(Cow::from("page 1 "), Cow::from(" text"));
-        let p = Article::from("[[page 1 | text]]");
+        Article::from("[[page 1 | text]]");
         // assert_eq!(p.links, map!(Cow::from("page 1 ") => Cow::from(" text")));
         // assert_eq!(p.links, map);
     }

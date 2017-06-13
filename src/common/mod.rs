@@ -4,33 +4,44 @@ pub mod tree;
 use std::collections::HashMap;
 use std::str;
 use std::str::from_utf8;
-use nom::{eol};
+use nom::{eol, not_line_ending};
 
-// fn not_eol(chr:u8) -> bool {
-//     chr != '\r' as u8 && chr == '\n' as u8
-// }
+
 pub fn space_but_not_eol(chr:u8) -> bool {
     chr == ' ' as u8 || chr == '\t' as u8
 }
 pub fn any_space(chr:u8) -> bool {
     chr == ' ' as u8 || chr == '\t' as u8 || chr == '\r' as u8 || chr == '\n' as u8
 }
+pub fn char_is_space(chr:u8) -> bool {
+    chr == ' ' as u8 || chr == '\t' as u8 || chr == '\r' as u8 || chr == '\n' as u8
+}
 pub fn not_space(chr:u8) -> bool {!any_space(chr)}
 
-// fn is_line_ending_or_comment(chr:char) -> bool {
-//   chr == ';' || chr == '\n'
-// }
+// named!(multi<&[u8], Vec<&[u8]> >,
+//    fold_many0!( tag!( "abcd" ), Vec::new(), |mut acc: Vec<_>, item| {
+//      acc.push(item);
+//      acc
+//  }));
 
-// named!(alphanumeric<&str,&str>,         take_while_s!(is_alphanumeric));
-// named!(not_line_ending<&str,&str>,      is_not_s!("\r\n"));
-// named!(space_or_eol<&str,&str>, is_a_s!(" \t\r\n"));
-// named!(space<&str,&str>, is_a_s!(" \t\r\n"));
-// named!(space<&str,&str>,                take_while_s!(is_space));
+named!(pub count_eols<usize>,
+       do_parse!(
+           eols: many0!(complete!(
+               do_parse!(
+                   not_line_ending >>
+                   eol >>
+                   ()
+               )
+           )) >>
+           (eols.len())
+       )
+);
+
 
 named!(pub space_not_eol, take_while!(space_but_not_eol));
 
 
-named!(pub space_max1_eol,
+named!(pub space_max1eol,
        recognize!(
            complete!(
                do_parse!(
@@ -44,7 +55,7 @@ named!(pub space_max1_eol,
 );
 
 
-named!(pub space_min_2eol,
+named!(pub space_min2eol,
        complete!(
            recognize!(
                do_parse!(
@@ -52,7 +63,7 @@ named!(pub space_min_2eol,
                    eol >>
                    opt!(take_while!(space_but_not_eol)) >>
                    eol >>
-                   opt!(take_while!(any_space)) >>
+                   spaces: opt!(take_while!(char_is_space)) >>
                    ()
                )
            )
@@ -133,94 +144,97 @@ named!(pub uri_scheme,
 /// example.org
 named!(pub domain_name,
        recognize!(
-           chain!(
-               is_not!( "./ \r\n\t" ) ~
-                   tag!(".")    ~
-                   is_not!( "./ \r\n\t" ),
-               || {}
+           do_parse!(
+               is_not!( "./ \r\n\t" ) >>
+               tag!(".")    >>
+               is_not!( "./ \r\n\t" ) >>
+               ()
            )
        )
 );
 
-/// Url query part:
-///
-/// Examples:
-///
-/// key=value
-/// key
-///
-/// Value can contain "=". Value ends on space or "&" sign
-named!(pub url_query_params1<(&str, &str)>,
-       alt_complete!(
-           do_parse!(
-               key: map_res!(is_not!( " \r\n\t=" ), from_utf8) >>
-                   tag!("=") >>
-                   val: map_res!(is_not!( " \r\n\t&" ), from_utf8) >>
-                   (key, val)
-           )
-               |
-           do_parse!(
-               key: map_res!(is_not!( " \r\n\t=" ), from_utf8) >>
-                   (key, "")
-           )
-       )
+named_attr!(
+    #[doc = "1 pair of parameters from URL query (`a=1`)
+
+ Examples:
+
+ key=value
+ key
+
+ Value can contain \"=\". Value ends on space or \"&\" sign.
+
+"], pub url_query_params1<(&str, &str)>,
+    alt_complete!(
+        do_parse!(
+            key: map_res!(is_not!( " \r\n\t=" ), from_utf8) >>
+            tag!("=") >>
+            val: map_res!(is_not!( " \r\n\t&" ), from_utf8) >>
+            // opt!(eol_or_eof) >>
+            (key, val)
+        ) |
+        do_parse!(
+            key: map_res!(is_not!( " \r\n\t=" ), from_utf8) >>
+            // key: map_res!(take_until_either!( eol_or_eof ), from_utf8) >>
+            // opt!(eol_or_eof) >>
+            (key, "")
+        )
+    )
 );
 
-/// Url query params without first "?" sign
-///
-/// Returns: Vec<tuple>
-///
-/// Example input:
-///
-/// gfe_rd=cr&ei=zCZLWNPMHceAuAH2-oCYDw&gws_rd=ssl#newwindow=1&q=url+query+string
-///
-// HashMap<&'a str, &'a str>
-// named!(url_query_params<HashMap<&str, &str> >,
-named!(pub url_query_params<Vec<(&str, &str)> >,
-       do_parse!(
-           params: separated_list!(char!('&'), url_query_params1) >>
-           (params)
-       )
+named_attr!(
+    #[doc = "Url query parameters without first \"?\" sign.
+
+ Returns: `Vec<tuple>`
+
+ Example input:
+
+```text
+gfe_rd=cr&ei=zCZLWNPMHceAuAH2-oCYDw&gws_rd=ssl#newwindow=1&q=url+query+string
+```
+"], pub url_query_params<Vec<(&str, &str)> >,
+    do_parse!(
+        params: separated_list!(
+            complete!(char!('&')),
+            complete!(url_query_params1)
+        ) >>
+        (params)
+    )
 );
+
 
 named!(pub url_query<HashMap<&str, &str> >,
        complete!(
            do_parse!(
                tag!("?") >>
-                   params: separated_list!(tag!("&"), url_query_params1) >>
-               // (params)
-                   (params.iter().fold(
-                       HashMap::new(),
-                       |mut total, tuple| {total.insert(tuple.0, tuple.1); total})
-                   )
+               params: url_query_params >>
+               (params.iter().fold(
+                   HashMap::new(),
+                   |mut total, tuple| {total.insert(tuple.0, tuple.1); total})
+               )
            )
        )
 );
 
-/// Host name
+///
 ///
 /// host1.example.org
 /// sub.host1.example.org
-named!(pub hostname,
+named_attr!(
+    #[doc = "Hostname (`host.example.org`).
+"], pub hostname,
        recognize!(
-           chain!(
-               // many1!(
-               // not!(char!('.'))
-               // is_not_s!( "./ \r\n\t" ) ~
-               // recognize!(
-               is_not!(". /\r\n\t") ~
-                   many1!(
-                       recognize!(
-                       chain!(
-                           tag!(".") ~
-                               is_not!(". /\r\n\t"),
-                           || {}
-                       )
+           do_parse!(
+               is_not!(". /\r\n\t") >>
+               many1!(
+                   recognize!(
+                       do_parse!(
+                           tag!(".") >>
+                           is_not!(". /\r\n\t") >>
+                           ()
                        )
                    )
-                   // domain_name
-                   ,
-               || {}
+               ) >>
+               ()
            )
        )
 );
@@ -238,7 +252,7 @@ mod tests {
         let mut tests = HashMap::new();
         tests.insert(&b" \n \n "[..], Done(&b"\n "[..], &b" \n "[..]));
         for (input, expected) in &tests {
-            assert_eq!(space_max1_eol(input), *expected);
+            assert_eq!(space_max1eol(input), *expected);
         }
     }
 
@@ -250,7 +264,7 @@ mod tests {
         tests.insert(&b"\r\n \r\n"[..], Done(&b""[..], &b"\r\n \r\n"[..]));
         tests.insert(&b"\r\n\r\n"[..], Done(&b""[..], &b"\r\n\r\n"[..]));
         for (input, expected) in &tests {
-            assert_eq!(space_min_2eol(input), *expected);
+            assert_eq!(space_min2eol(input), *expected);
         }
     }
 
@@ -285,6 +299,92 @@ mod tests {
                 Error(e) => panic!("error: {:?}", e),
             }
         }
+    }
+
+    #[test]
+    fn test_hostname() {
+        let mut tests = HashMap::new();
+        tests.insert(
+            "host.pashinin.com",
+            Done(&b""[..], "host.pashinin.com".as_bytes())
+        );
+        tests.insert(
+            "sub.www.youtube.com",
+            Done(&b""[..], "sub.www.youtube.com".as_bytes())
+        );
+        tests.insert(
+            "asd.тест.рф",
+            Done(&b""[..], "asd.тест.рф".as_bytes())
+        );
+        for (input, expected) in &tests {
+            assert_eq!(hostname(input.as_bytes()), *expected);
+        }
+    }
+
+    // #[test]
+    // fn test_url_query() {
+    //     let mut tests = HashMap::new();
+    //     // tests.insert(
+    //     //     &b"?d=1"[..],
+    //     //     Done(&b""[..], HashMap::new().insert("d", "1"))
+    //     // );
+    //     tests.insert(&b"d=1"[..], Done(&b""[..], vec![]));
+    //     for (input, expected) in &tests {
+    //         assert_eq!(url_query_params(input), *expected);
+    //     }
+    // }
+
+    #[test]
+    fn test_url_query_params() {
+        let mut tests = HashMap::new();
+        // key=value & key2=value2
+        tests.insert(
+            &b"a=1&b=2"[..],
+            Done(&b""[..],
+                 // ("a", "1")
+                 vec![
+                     ("a", "1"),
+                     ("b", "2"),
+                 ]
+            )
+        );
+        // tests.insert(
+        //     &b"gfe_rd=cr&ei=zCZLWNPMHceAuAH2-oCYDw&gws_rd=ssl#newwindow=1&q=url+query+string"[..],
+        //     Done(&b""[..], vec![
+        //         ("gfe_rd", "cr"),
+        //         ("ei", "zCZLWNPMHceAuAH2-oCYDw"),
+        //         ("gws_rd", "ssl#newwindow=1"),
+        //         ("q", "url+query+string"),
+        //     ])
+        // );
+
+        // test a key without a value:  /path?param
+        // param   -  ("param", "")
+        // tests.insert(
+        //     &b"key"[..],
+        //     Done(&b""[..], vec![
+        //         ("key", ""),
+        //     ])
+        // );
+
+        // tests.insert(&b""[..], Done(&b""[..], vec![]));
+        for (input, expected) in &tests {
+            assert_eq!(url_query_params(input), *expected);
+        }
+    }
+
+
+    #[test]
+    fn test_url_query_params1() {
+        // key=value
+        // key
+        let mut tests = HashMap::new();
+        tests.insert(&b"key=value"[..], Done(&b""[..], ("key", "value")));
+        tests.insert(&b"b=2"[..], Done(&b""[..], ("b", "2")));
+        tests.insert(&b"key"[..], Done(&b""[..], ("key", "")));
+        // tests.insert(&b"key="[..], Incomplete(Needed::Size(4)));
+        tests.insert(&b"key="[..], Done(&b""[..], ("key", "")));
+        for (input, expected) in &tests {assert_eq!(url_query_params1(input), *expected);}
     }
 
 }
