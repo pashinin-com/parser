@@ -1,6 +1,8 @@
 # import os
 
+from rparser import article_render as render
 
 def test_normal():
-    from .rparser import article_render as render
-    # assert 'asd' == render('asd')
+    src = 'asd'
+    html, info = render(src)
+    assert '<p>asd</p>' == html

@@ -29,11 +29,13 @@ wheel:
 py2:
 	python2.7 setup.py build_rust
 	python2.7 setup.py build
+	(cd rparser; ln -sf ../build/lib.linux-x86_64-2.7/rparser/librparser.so librparser.so)
 
 # .PHONY: build
 py3:
 	python3.6 setup.py build_rust
 	python3.6 setup.py build
+	(cd rparser; ln -sf ../build/lib/rparser/librparser.so librparser.so)
 
 install:
 	python setup.py build_rust

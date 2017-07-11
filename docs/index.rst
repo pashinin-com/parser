@@ -77,13 +77,46 @@ Links
 
    \href{url}{text}
 
-Blocks
-------
+Complex blocks
+--------------
 
 .. code-block:: latex
 
    \Article{id}
    \Book{id}
+
+Files
+-----
+
+.. code-block:: latex
+
+   \file{sha1}
+
+It depends how it will be rendered on what is this file: image, video,
+sound, etc...
+
+Image:
+
+By default a single image is centered, size is original
+
+An uploaded (known) file will render as:
+
+.. code-block:: latex
+
+   \file{sha1, w=100, h=100}
+
+.. image:: images/Lenna.png
+
+
+
+A missing file will render as:
+
+Video
+-----
+
+.. code-block:: latex
+
+   \youtube{video-code}
 
 
 Tables
