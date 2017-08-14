@@ -6,6 +6,8 @@
 rparser - Python parsers (in Rust)
 ==================================
 
+Just my test project
+
 .. code-block:: bash
 
    pip install rparser
@@ -97,15 +99,17 @@ sound, etc...
 
 Image:
 
-By default a single image is centered, size is original
+By default a single image is left aligned, size is original
 
 An uploaded (known) file will render as:
 
 .. code-block:: latex
 
-   \file{sha1, w=100, h=100}
+   \file{sha1, w=100}
+   \file{a9a7d18e7afe12c7e6ebfbafbb997793c1225250, w=100}
 
 .. image:: images/Lenna.png
+   :width: 100
 
 
 
@@ -114,9 +118,16 @@ A missing file will render as:
 Video
 -----
 
+Just a link to youtube video or a special tag:
+
 .. code-block:: latex
 
    \youtube{video-code}
+
+.. code-block:: latex
+
+   \youtube{video-code}
+
 
 
 Tables

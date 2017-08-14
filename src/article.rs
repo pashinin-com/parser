@@ -15,7 +15,7 @@ use common::*;
 use html;
 use html::tag;
 use std::convert::From;
-use nom::{Consumer,ConsumerState,Move,Input,Producer,MemProducer};
+use nom::{Consumer,ConsumerState,Move,Input,Producer,MemProducer, hex_digit, alphanumeric, anychar};
 use nom::Offset;
 
 
@@ -77,6 +77,13 @@ pub enum Tag<'a> {
         path: Cow<'a, str>,
         query: Cow<'a, str>,
     },
+
+    // Latex command
+    Command{
+        name: Cow<'a, str>,
+        contents: Cow<'a, str>,
+    },
+
     Text(Cow<'a, str>),
     HTMLTag(html::HTMLTag<'a>),
     MathInline(Cow<'a, str>),
@@ -476,6 +483,10 @@ pub fn article_render<'a>(py: Python, args: &PyTuple, kwargs: Option<&PyDict>) -
     ]))
 }
 
+pub struct File<'a> {
+    pub sha1: Cow<'a, str>,
+    pub contenttype: Cow<'a, str>,
+}
 
 /// Article parser
 pub struct Article<'a> {
@@ -483,6 +494,9 @@ pub struct Article<'a> {
     // root: Tag<'a>,
     pub html: Cow<'a, str>,
     pub links_internal: HashMap<Cow<'a, str>, Cow<'a, str>>,
+    pub files: HashMap<Cow<'a, str>, File<'a>>,
+    pub files_missing: HashSet<String>,
+    pub files_used: HashSet<String>,
     links_internal_missing: HashSet<String>,
 }
 
@@ -499,12 +513,29 @@ impl<'a> Article<'a> {
     #[cfg(feature = "python")]
     pub fn py_info(&self, py: Python) -> PyDict {
         let info = PyDict::new(py);
+
         if !self.links_internal_missing.is_empty() {
             let v: Vec<PyObject> = self.links_internal_missing.iter()
                 .map(|x| PyString::new(py, &x).into_object())
                 .collect();
             let missing_links = PyTuple::new(py, v.as_slice());
             info.set_item(py, "missing_links", missing_links).unwrap();
+        }
+
+        if !self.files_missing.is_empty() {
+            let v: Vec<PyObject> = self.files_missing.iter()
+                .map(|x| PyString::new(py, &x).into_object())
+                .collect();
+            let files_missing = PyTuple::new(py, v.as_slice());
+            info.set_item(py, "files_missing", files_missing).unwrap();
+        }
+
+        if !self.files_used.is_empty() {
+            let v: Vec<PyObject> = self.files_used.iter()
+                .map(|x| PyString::new(py, &x).into_object())
+                .collect();
+            let files_used = PyTuple::new(py, v.as_slice());
+            info.set_item(py, "files_used", files_used).unwrap();
         }
         info
     }
@@ -515,6 +546,10 @@ impl<'a> Article<'a> {
     /// article_parse("src", set_links={"page name 1": "/articles/1"})
     #[cfg(feature = "python")]
     pub fn set_info_from_pydict(&mut self, py: Python, dict: &PyDict) {
+        self.files_missing = HashSet::new();
+        self.files_used = HashSet::new();
+        self.links_internal_missing = HashSet::new();
+
         // set internal links
         if let Some(set_links) = dict.get_item(py, "set_links") {
             let links = set_links.extract::<PyDict>(py).unwrap();
@@ -523,8 +558,19 @@ impl<'a> Article<'a> {
                 let u: String = url.extract::<PyString>(py).unwrap().to_string(py).unwrap().into_owned();
                 self.links_internal.insert(Cow::from(p), Cow::from(u));
             }
-            self.render();
         }
+        if let Some(files_obj) = dict.get_item(py, "files") {
+            let files = files_obj.extract::<PyDict>(py).unwrap();
+            for (k, v) in files.items(py) {
+                let hash: String = k.extract::<PyString>(py).unwrap().to_string(py).unwrap().into_owned();
+                // let u: String = url.extract::<PyString>(py).unwrap().to_string(py).unwrap().into_owned();
+                self.files.insert(Cow::from(hash.clone()), File{
+                    sha1: Cow::from(hash),
+                    contenttype: Cow::from(""),
+                });
+            }
+        }
+        self.render();
     }
 
     fn render(&mut self) {
@@ -566,6 +612,9 @@ impl<'a> From<&'a str> for Article<'a> {
             src: src.as_bytes(),
             html: Cow::from(""),
             links_internal: HashMap::new(),
+            files: HashMap::new(),
+            files_missing: HashSet::new(),
+            files_used: HashSet::new(),
             links_internal_missing: HashSet::new(),
         };
         a.render();
@@ -577,25 +626,16 @@ impl<'a> From<&'a [u8]> for Article<'a> {
         let mut a = Article {
             src: src,
             html: Cow::from(""),
+            files: HashMap::new(),
+            files_missing: HashSet::new(),
             links_internal: HashMap::new(),
+            files_used: HashSet::new(),
             links_internal_missing: HashSet::new(),
         };
         a.render();
         a
     }
 }
-
-
-
-
-// #[derive(PartialEq,Eq,Debug)]
-// enum State {
-//   Beginning,
-//   Middle,
-//   End,
-//   Done,
-//   Error
-// }
 
 
 pub trait ToHtml {
@@ -616,7 +656,6 @@ impl<'a> ToHtml for Tag<'a> {
     fn to_html(&self, parser: &mut Article) -> Cow<str>
     {
         match *self {
-
             Tag::Container{ref c} => c.to_html(parser),
             // {
             //     let children_strings: Vec<Cow<str>> = c.iter()
@@ -625,6 +664,44 @@ impl<'a> ToHtml for Tag<'a> {
             //     let s = children_strings.join("");
             //     Cow::from(s)
             // }
+            Tag::Command{ref name, ref contents} => {
+                match &*name.to_string() {
+                    "youtube" => Cow::from(format!(r#"<iframe width="560" height="315" src="https://www.youtube.com/embed/{}" frameborder="0" allowfullscreen></iframe>"#, contents)),
+                    "file" => {
+                        let sha1 = contents.trim();
+                        match parser.files.get(sha1) {
+                            Some(f) => {
+                                // Cow::from(format!("<a href=\"{}\">{}</a>", l, text))
+                                parser.files_used.insert(String::from(sha1));
+
+                                match &*f.contenttype.to_string() {
+                                    "image" => {
+                                        // Cow::from(format!("<a href=\"{}\">{}</a>", l, text))
+                                        parser.files_used.insert(String::from(sha1));
+                                        Cow::from(format!("<img src=\"{}\"/>", sha1))
+                                    },
+                                    _ => {
+                                        // parser.files_missing.insert(String::from(sha1));
+                                        // Cow::from(format!("file-{} (unknown type - download)", sha1))
+                                        // parser.links_internal_missing.insert(String::from(page));
+                                        Cow::from(format!("<a class=\"download unknowntype\" href=\"{}\">Download</a>", f.contenttype))
+                                    }
+                                }
+                                // Cow::from(format!("file-{}", sha1))
+                            },
+                            None => {
+                                parser.files_used.insert(String::from(sha1));
+                                parser.files_missing.insert(String::from(sha1));
+                                // Cow::from(format!("no-file-{}", sha1))
+                                Cow::from(format!(""))
+                                // parser.links_internal_missing.insert(String::from(page));
+                                // Cow::from(format!("<a class=\"redlink\" href=\"/articles/{}\">{}</a>", page, text))
+                            }
+                        }
+                    },
+                    _ => Cow::from(format!("Unknown command: \\{}", name)),
+                }
+            },
             Tag::Paragraph{ref c} => {
                 let children_strings: Vec<Cow<str>> = c.iter()
                     .map(|&ref x| x.to_html(parser))
@@ -648,7 +725,6 @@ impl<'a> ToHtml for Tag<'a> {
                                 Cow::from(format!("<a class=\"redlink\" href=\"/articles/{}\">{}</a>", page, text))
                             }
                         }
-                        // link = &Some(Cow::from(page));
                     }
                 }
 
@@ -809,6 +885,10 @@ named!(pub cut,
        tag!(">---")
 );
 
+named!(pub sha1,
+       recognize!(many_m_n!(32, 32, hex_digit ))
+);
+
 named!(
     list_item_content<Vec<Tag>>,
     do_parse!(
@@ -852,6 +932,43 @@ named_attr!(
             Tag::ListUnnumberedItem(words)
         })
         // (words)
+    )
+);
+
+named_attr!(
+    #[doc = "`\\youtube{...}` command"],
+    pub youtube<Tag>,
+    do_parse!(
+        char!( '\\' ) >>
+        tag!("youtube") >>
+        tag!("{") >>
+        sha1: map_res!(alphanumeric, from_utf8) >>
+        tag!("}") >>
+        ({
+            Tag::Command{
+                name: Cow::from("youtube"),
+                contents: Cow::from(sha1),
+            }
+        })
+    )
+);
+
+named_attr!(
+    #[doc = "`LaTeX-style command: \\command{...}`"],
+    pub command<Tag>,
+    do_parse!(
+        char!( '\\' ) >>
+        name: map_res!(alphanumeric, from_utf8) >>
+        tag!("{") >>
+        // sha1: map_res!(alphanumeric, from_utf8) >>
+        contents: map_res!(take_until!("}"), from_utf8) >>
+        tag!("}") >>
+        ({
+            Tag::Command{
+                name: Cow::from(name),
+                contents: Cow::from(contents),
+            }
+        })
     )
 );
 
@@ -1156,13 +1273,14 @@ named!(pub parse<Vec<Tag>>,
 
 
 named_attr!(
-    #[doc = "Element that go only from line start"],
+    #[doc = "Line-start elements (0 position)"],
     line_start_element<Tag>,
     alt_complete!(
         code_tabs |
         complete!(list_numbered) |
         html_tag |
         header |
+        command |
         paragraph |
         space_tag
     )
@@ -1170,11 +1288,12 @@ named_attr!(
 
 
 named_attr!(
-    #[doc = "Elements that go NOT only from line start"],
+    #[doc = "Middle-line elements (> 0 position)"],
     element<Tag>,
     alt_complete!(
         code_tabs |
         html_tag |
+        command |
         paragraph |
         space_tag
     )
@@ -1186,6 +1305,7 @@ named!(root_element<Tag>,
            // list_unnumbered |
            complete!(list_numbered) |
            // paragraphs |
+           command |
            paragraph |
            space_tag
        )
@@ -1217,20 +1337,13 @@ named!(html_tag<Tag>,
 named!(
     word<Tag>,
     alt_complete!(
-        // words |
         // many1!(word) => {|x| Tag::Comment} |
-        // list_numbered |
-        // code |
-        // header |
         internal_link |
         external_link |
         url |
         comment |
         html_tag |
-        // list_unnumbered |
-
         symbols               // any text
-        // word_separator
     )
 );
 
@@ -1529,6 +1642,21 @@ mod tests {
     }
 
     #[test]
+    fn test_youtube(){
+        let mut tests = HashMap::new();
+        tests.insert("\\youtube{123abc}", Done(
+            &b""[..],
+            Tag::Command{name: Cow::from("youtube")}
+        ));
+
+        for (input, expected) in tests {
+            assert_eq!(
+                youtube(input.as_bytes()),
+                expected);
+        }
+    }
+
+    #[test]
     fn test_code_tabs(){
         let mut tests = HashMap::new();
         tests.insert(
@@ -1575,6 +1703,9 @@ mod tests {
         tests.insert("<script >", "&lt;script&gt;");
         tests.insert("<table><tr><td>", "<table><tr><td>");
         // tests.insert("<i>italics</i>", "<table><tr><td>");
+
+
+        // tests.insert("\\youtube{abc}", "command");
 
 
         // code tabs
