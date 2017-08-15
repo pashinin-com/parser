@@ -1646,7 +1646,10 @@ mod tests {
         let mut tests = HashMap::new();
         tests.insert("\\youtube{123abc}", Done(
             &b""[..],
-            Tag::Command{name: Cow::from("youtube")}
+            Tag::Command{
+                name: Cow::from("youtube"),
+                contents: Cow::from("123abc")
+            }
         ));
 
         for (input, expected) in tests {
