@@ -37,6 +37,20 @@ py3:
 	python3.6 setup.py build
 	(cd rparser; ln -sf ../build/lib/rparser/librparser.so librparser.so)
 
+py3.5:
+	python3.5 setup.py build_rust
+	python3.5 setup.py build
+	(cd rparser; ln -sf ../build/lib/rparser/librparser.so librparser.so)
+
+pypy3:
+	# pypy3 -m ensurepip --user
+	# pypy3 -m pip install --user --upgrade pip
+	# pypy3 -m pip install --user setuptools
+	pypy3 setup.py build_rust
+	pypy3 setup.py build
+	(cd rparser; ln -sf ../build/lib/rparser/librparser.so librparser.so)
+	pypy3 -c "import rparser"
+
 install:
 	python setup.py build_rust
 	python setup.py build
