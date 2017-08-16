@@ -1,7 +1,7 @@
 from __future__ import print_function
 
 __title__ = 'rparser'
-__version__ = '0.1.20'
+__version__ = '0.1.21'
 # __build__ = 0x021203
 __author__ = 'Sergey Pashinin'
 __license__ = 'GPL 3.0'
