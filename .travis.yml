@@ -100,7 +100,7 @@ script:
 #
 # Only py3: Name-1.10.4-py3-none-any.whl
 before_deploy:
-  - sudo pip install twine
+  - pip install twine
   - ls -la dist
   - if [[ $TRAVIS_PYTHON_VERSION == 2.7 ]]; then mmv "dist/rparser-*-*-*-*_*.whl" "dist/rparser-#1-py27-none-any.whl"; fi
   - if [[ $TRAVIS_PYTHON_VERSION == 3.5 ]]; then mmv "dist/rparser-*-*-*-*_*.whl" "dist/rparser-#1-py35-none-any.whl"; fi
