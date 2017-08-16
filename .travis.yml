@@ -82,6 +82,7 @@ script:
   - cargo test --verbose --release
   - python setup.py bdist_wheel
   - (cd build/lib/; python -c "import rparser")
+  - (cd rparser; ln -sf ../build/lib/rparser/librparser.so librparser.so)
   - python setup.py test
   # - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then docker run --rm -v `pwd`:/io $DOCKER_IMAGE $PRE_CMD /io/build-wheels.sh $TRAVIS_OS_NAME; fi
   # - ls wheelhouse/
@@ -92,14 +93,21 @@ script:
 
 # Rename wheel to accept in pypi. Pypi does not accept "linux_x86-64"
 #
-# Example (Django): Django-1.10.4-py2.py3-none-any.whl
+# After compilation we have:
+#
+#   rparser-0.1.19-cp36-cp36m-linux_x86_64.whl
+#   Django-1.10.4-py2.py3-none-any.whl           Example (Django)
+#
 # Only py3: Name-1.10.4-py3-none-any.whl
 before_deploy:
   - sudo pip install twine
   - ls -la dist
+  - if [[ $TRAVIS_PYTHON_VERSION == 2.7 ]]; then mmv "dist/rparser-*-*-*-*_*.whl" "dist/rparser-#1-py27-none-any.whl"; fi
+  - if [[ $TRAVIS_PYTHON_VERSION == 3.5 ]]; then mmv "dist/rparser-*-*-*-*_*.whl" "dist/rparser-#1-py35-none-any.whl"; fi
+  - if [[ $TRAVIS_PYTHON_VERSION == 3.6 ]]; then mmv "dist/rparser-*-*-*-*_*.whl" "dist/rparser-#1-py36-none-any.whl"; fi
   # - mmv "dist/rparser-*-*-*-*_*.whl" "dist/rparser-#1-py2.py3-none-any.whl"
   - ls -la dist
-  # rparser-0.1.6-cp35-cp35m-linux_x86_64.whl
+
 
 # To use encrypted variables:
 #
