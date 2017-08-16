@@ -44,7 +44,8 @@ install:
 	sudo python setup.py install
 
 test:
-	python setup.py -q nosetests
+	python setup.py test
+# python setup.py -q nosetests
 # py.test tests
 
 bench:
