@@ -14,8 +14,6 @@ matrix:
     #   language: python
     #   python: "3.5"
     - os: linux
-      python: "2.7"
-    - os: linux
       python: "3.5"
     - os: linux
       python: "3.6"
