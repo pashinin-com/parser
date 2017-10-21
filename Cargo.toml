@@ -6,7 +6,7 @@ authors = ["Sergey Pashinin <sergey@pashinin.com>"]
 
 [lib]
 name = "rparser"
-crate-type = ["dylib"]  # .so
+crate-type = ["cdylib"]  # .so
 # cdylib is smaller than dylib
 # dylib, rlib, staticlib
 # rlib is "rust" static lib (with some info for rust)
