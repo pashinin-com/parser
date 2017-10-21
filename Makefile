@@ -33,9 +33,14 @@ py2:
 
 # .PHONY: build
 py3:
-	python3.6 setup.py build_rust
+# for musl set -crt-static
+# RUSTFLAGS='-C target-feature=-crt-static' python3.6 setup.py build_rust
+	CARGO_INCREMENTAL=1 python3.6 setup.py build_rust
 	python3.6 setup.py build
-	(cd rparser; ln -sf ../build/lib/rparser/librparser.so librparser.so)
+	cp -f target/release/librparser.so rparser.so
+#	ln -sf build/lib/rparser/rparser.so rparser.so
+#	(cd rparser; ln -sf ../build/lib/rparser/librparser.so librparser.so)
+# (cd rparser; ln -sf ../target/x86_64-unknown-linux-musl/release/librparser.so librparser.so)
 
 py3.5:
 	python3.5 setup.py build_rust

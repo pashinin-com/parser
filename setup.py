@@ -29,8 +29,11 @@ PY2 = sys.version_info[0] < 3
 PY3 = sys.version_info[0] >= 3
 
 
-with open('rparser/__init__.py', 'r') as fd:
-    version = re.search(r'^__version__\s*=\s*[\'"]([^\'"]*)[\'"]',
+# with open('rparser/__init__.py', 'r') as fd:
+#     version = re.search(r'^__version__\s*=\s*[\'"]([^\'"]*)[\'"]',
+#                         fd.read(), re.MULTILINE).group(1)
+with open('Cargo.toml', 'r') as fd:
+    version = re.search(r'^version\s*=\s*[\'"]([^\'"]*)[\'"]',
                         fd.read(), re.MULTILINE).group(1)
 
 if not version:
@@ -45,13 +48,16 @@ setup(
     author_email='sergey@pashinin.com',
     url='https://github.com/pashinin-com/rparser',
     requires=[],
-    packages=['rparser'],
+    packages=[  # directories to include
+        # 'rparser'
+    ],
     distclass=RustDistribution,
     tests_require=['nose'],
     test_suite='nose.collector',
     cmdclass={
         'build_rust': build_rust_cmdclass(
-            [('.', 'rparser')],
+            # [('.', 'rparser')],
+            [('.', '.')],
             extra_cargo_args=[
                 '--features', 'py3',
             ] if PY3 else

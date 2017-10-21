@@ -9,24 +9,55 @@ use std::fmt::{Display, Formatter};
 use std::borrow::Cow;
 use std::collections::HashSet;
 use std::collections::HashMap;
-use nom::{eol, IResult, not_line_ending};
+use nom::{eol, IResult};
+// use nom::not_line_ending;
 use std::str::from_utf8;
+use std::string::String;
 use common::*;
 use html;
 use html::tag;
 use std::convert::From;
-use nom::{Consumer,ConsumerState,Move,Input,Producer,MemProducer, hex_digit, alphanumeric, anychar};
+use nom::{Consumer,ConsumerState,Move,Input,Producer,MemProducer, hex_digit, alphanumeric};
 use nom::Offset;
 
+#[cfg(feature = "python")]
+use pyo3::{
+    Py,
+    Python, PyObject, ToPyObject, PyTuple, PyString,
+    // PyResult,
+    PyDict,
+    // ObjectProtocol,
+    IntoPyObject,
+    // PyObjectRef,
+    // FromPyObject
+};
+use pyo3::prelude::*;
+// use pyo3::ToPyPointer;
+// use pyo3::IntoPyDictPointer;
+use pyo3::PyTryInto;
+// use std::io::Beginning
+
+
+// use cpython::{Python, PythonObject, PyObject, ToPyObject, PyTuple, PyString, PyResult, PyDict};
+
+
+// const youtube_format_str: &'static str = r#"<div style="position:relative;padding-bottom: 56.25%; /* 16:9 */ padding-top: 25px;height: 0;"><iframe style="position: absolute;top: 0;left: 0;width: 100%;height: 100%;border:0px;" src="https://www.youtube.com/embed/{}"></iframe></div>"#;
+// fn format_youtube(&'str code) -> String {
+//     format!(, code)
+// }
 
 // allowed_html_tags = HashMap::new();
 // allowed_html_tags.insert(Cow::from("table"));
 
 
-const ALLOWED_HTML_TAGS: [&'static str; 3] = [
+// const BROWSERS: &'static [&'static str] = &["firefox", "chrome"];
+const ALLOWED_HTML_TAGS: &'static [&'static str] = &[
     "table",
     "tr",
-    "td"
+    "td",
+    "p",
+    "b",
+    "div"
 ];
 
 #[derive(PartialEq,Eq,Debug)]
@@ -46,9 +77,6 @@ struct TestConsumer<'a> {
     line: usize,
     col: usize
 }
-
-#[cfg(feature = "python")]
-use cpython::{Python, PythonObject, PyObject, ToPyObject, PyTuple, PyString, PyResult, PyDict};
 
 
 #[allow(missing_docs)]
@@ -91,7 +119,7 @@ pub enum Tag<'a> {
     Comment,
     LinkInternal{page: Cow<'a, str>, text: Cow<'a, str>, link: Option<Cow<'a, str>>},
 
-    /// `[[http://pashinin.com Title]]`
+    /// `[http://pashinin.com Title]`
     ///
     /// Which will render as: [Title](http://pashinin.com)
     LinkExternal{
@@ -138,7 +166,8 @@ impl<'a> Consumer<&'a[u8], usize, (), Move> for TestConsumer<'a> {
                                 self.state   = State::Done;
                                 self.c_state = ConsumerState::Done(Move::Consume(0), self.counter);
                             },
-                            IResult::Incomplete(_) => {
+                            IResult::Incomplete(_n) => {
+                                // println!("Middle got Incomplete({:?})", n);
                                 // self.c_state = ConsumerState::Continue(Move::Await(n));
                                 self.state   = State::Done;
                                 self.c_state = ConsumerState::Done(Move::Consume(0), self.counter);
@@ -296,10 +325,10 @@ impl<'a> Display for Tag<'a> {
 /// Convert Tag to a python object (PyTuple, PyDict)
 #[cfg(feature = "python")]
 impl<'a> ToPyObject for Tag<'a> {
-    type ObjectType = PyObject;
+    // type ObjectType = PyObject;
 
     #[inline]
-    fn to_py_object(&self, py: Python) -> PyObject {
+    fn to_object(&self, py: Python) -> PyObject {
         match *self {
             // Tag::Root{c} => {
             //     match self.children {
@@ -381,7 +410,7 @@ impl<'a> ToPyObject for Tag<'a> {
             //     });
             //     d.into_object()
             // }
-            _ => PyDict::new(py).into_object()
+            _ => PyDict::new(py).into_object(py)
         }
     }
 }
@@ -470,17 +499,23 @@ impl<'a> ToPyObject for Tag<'a> {
 
 /// Render article to HTML
 #[cfg(feature = "python")]
-pub fn article_render<'a>(py: Python, args: &PyTuple, kwargs: Option<&PyDict>) -> PyResult<PyTuple> {
-    let source = args.get_item(py, 0).to_string();
-    let mut a = Article::from(source.as_bytes());
+pub fn article_render<'a>(args: &PyTuple, kwargs: Option<&PyDict>) -> Py<PyTuple> {
+    let py = args.py();
+    let source = args.get_item(0).to_string();
+
+    // let mut article = Article::from(source.as_bytes());
+    let mut article = Article::new(py);
+    article.src = source.as_bytes();
+    article.render();
     if let Some(kwargs) = kwargs {
-        a.set_info_from_pydict(py, kwargs);
+        article.set_info(kwargs);
     }
 
-    Ok(PyTuple::new(py, &[
-        PyString::new(py, &a.html).into_object(),
-        a.py_info(py).into_object()
-    ]))
+
+    PyTuple::new(py, &[
+        PyString::new(py, &article.html).into_object(py),
+        article.py_info(py).into_object(py)
+    ])
 }
 
 pub struct File<'a> {
@@ -490,10 +525,21 @@ pub struct File<'a> {
 
 /// Article parser
 pub struct Article<'a> {
-    src: &'a [u8],
+    pub src: &'a [u8],
     // root: Tag<'a>,
     pub html: Cow<'a, str>,
+
+    py: Python<'a>,
+
+    //
     pub links_internal: HashMap<Cow<'a, str>, Cow<'a, str>>,
+    // pub links_internal: HashMap<&'a PyString, &'a PyString>,
+
+    // #[cfg(feature = "python")]
+    // pub context: HashMap<Cow<'a, str>, ToPyObject + 'a>,
+    // pub context: HashMap<Cow<'a, str>, PyObject>,
+    pub context: &'a PyDict,
+
     pub files: HashMap<Cow<'a, str>, File<'a>>,
     pub files_missing: HashSet<String>,
     pub files_used: HashSet<String>,
@@ -501,7 +547,6 @@ pub struct Article<'a> {
 }
 
 impl<'a> Article<'a> {
-
     /// Get some information about current article.
     /// Return a PyDict like:
     /// {
@@ -510,34 +555,56 @@ impl<'a> Article<'a> {
     ///
     /// What information is returned:
     ///
+    pub fn new(py: Python<'a>) -> Self {
+        let a = Article {
+            src: "".as_bytes(),
+            html: Cow::from(""),
+            py: py,
+            links_internal: HashMap::new(),
+            // context: HashMap::new(),
+            context: PyDict::new(py),
+            files: HashMap::new(),
+            files_missing: HashSet::new(),
+            files_used: HashSet::new(),
+            links_internal_missing: HashSet::new(),
+        };
+        // a.context.set_item("os", a.py.import("os").unwrap()).unwrap();
+        a.context.set_item("datetime", a.py.import("datetime").unwrap()).unwrap();
+        a
+    }
+
     #[cfg(feature = "python")]
-    pub fn py_info(&self, py: Python) -> PyDict {
+    pub fn py_info(&self, py: Python) -> PyObject {
+    // pub fn py_info(&self, py: Python) -> PyObjectRef {
         let info = PyDict::new(py);
 
         if !self.links_internal_missing.is_empty() {
             let v: Vec<PyObject> = self.links_internal_missing.iter()
-                .map(|x| PyString::new(py, &x).into_object())
+                .map(|x| PyString::new(py, &x).into_object(py))
                 .collect();
             let missing_links = PyTuple::new(py, v.as_slice());
-            info.set_item(py, "missing_links", missing_links).unwrap();
+            info.set_item("missing_links", missing_links).unwrap();
         }
 
         if !self.files_missing.is_empty() {
             let v: Vec<PyObject> = self.files_missing.iter()
-                .map(|x| PyString::new(py, &x).into_object())
+                .map(|x| PyString::new(py, &x).into_object(py))
                 .collect();
             let files_missing = PyTuple::new(py, v.as_slice());
-            info.set_item(py, "files_missing", files_missing).unwrap();
+            info.set_item("files_missing", files_missing).unwrap();
         }
 
         if !self.files_used.is_empty() {
             let v: Vec<PyObject> = self.files_used.iter()
-                .map(|x| PyString::new(py, &x).into_object())
+                .map(|x| PyString::new(py, &x).into_object(py))
                 .collect();
             let files_used = PyTuple::new(py, v.as_slice());
-            info.set_item(py, "files_used", files_used).unwrap();
+            info.set_item("files_used", files_used).unwrap();
         }
-        info
+        // info
+        // let mut map = HashMap::new();
+        // map.insert(Cow::from("page 1 "), Cow::from(" text"));
+        info.into_object(py)
     }
 
     /// Set some internal variables for rendering from PyDict
@@ -545,37 +612,56 @@ impl<'a> Article<'a> {
     ///
     /// article_parse("src", set_links={"page name 1": "/articles/1"})
     #[cfg(feature = "python")]
-    pub fn set_info_from_pydict(&mut self, py: Python, dict: &PyDict) {
+    pub fn set_info(&mut self, dict: &PyDict) {
         self.files_missing = HashSet::new();
         self.files_used = HashSet::new();
         self.links_internal_missing = HashSet::new();
 
         // set internal links
-        if let Some(set_links) = dict.get_item(py, "set_links") {
-            let links = set_links.extract::<PyDict>(py).unwrap();
-            for (page, url) in links.items(py) {
-                let p: String = page.extract::<PyString>(py).unwrap().to_string(py).unwrap().into_owned();
-                let u: String = url.extract::<PyString>(py).unwrap().to_string(py).unwrap().into_owned();
-                self.links_internal.insert(Cow::from(p), Cow::from(u));
-            }
-        }
-        if let Some(files_obj) = dict.get_item(py, "files") {
-            let files = files_obj.extract::<PyDict>(py).unwrap();
-            for (k, v) in files.items(py) {
-                let hash: String = k.extract::<PyString>(py).unwrap().to_string(py).unwrap().into_owned();
+        if let Some(set_links) = dict.get_item("set_links") {  // PyObjectRef
+            // let links = set_links.extract::<PyDict>().unwrap();
+            let links: &PyDict = set_links.try_into_exact().unwrap();
+            // let links = set_links.to_object(py).extract::<PyDict>(py).unwrap();
+            // let links = links.extract::<PyDict>().unwrap();
+            // let links = set_links.extract().unwrap();
+            // let links = set_links;
+            for (page, _url) in links.iter() {
+                // let p: String = page.extract::<PyString>(py).unwrap().to_string(py).unwrap().into_owned();
                 // let u: String = url.extract::<PyString>(py).unwrap().to_string(py).unwrap().into_owned();
-                self.files.insert(Cow::from(hash.clone()), File{
-                    sha1: Cow::from(hash),
-                    contenttype: Cow::from(""),
-                });
+                // self.links_internal.insert(Cow::from(p), Cow::from(u));
+                let p: &PyString = page.try_into_exact().unwrap();
+                let key: String = p.to_string().unwrap().into_owned();
+                let value: String = p.to_string().unwrap().into_owned();
+                self.links_internal.insert(Cow::from(key), Cow::from(value));
             }
         }
+        // if let Some(files_obj) = dict.get_item("files") {
+        //     // let files = files_obj.extract::<PyDict>().unwrap();
+        //     let files = files_obj.extract().unwrap();
+        //     for (k, _) in files.items() {
+        //         let hash: String = k.extract::<PyString>(py).unwrap().to_string(py).unwrap().into_owned();
+        //         // let u: String = url.extract::<PyString>(py).unwrap().to_string(py).unwrap().into_owned();
+        //         self.files.insert(Cow::from(hash.clone()), File{
+        //             sha1: Cow::from(hash),
+        //             contenttype: Cow::from(""),
+        //         });
+        //     }
+        // }
         self.render();
     }
 
-    fn render(&mut self) {
-        // let mut p = MemProducer::new(&b"omnomkthxbye"[..], 8);
-        let mut p = MemProducer::new(&self.src, 256);
+    // fn add_context_variable(&mut self, py: Python) {
+        // let p: String = page.extract::<PyString>(py).unwrap().to_string(py).unwrap().into_owned();
+        // let u: String = url.extract::<PyString>(py).unwrap().to_string(py).unwrap().into_owned();
+        // let locals = PyDict::new(py);
+        // let user: String = py.eval("os.getenv('USER') or os.getenv('USERNAME')", None, Some(&locals))?.extract(py)?;
+        // let user: String = py.eval("os.getenv('USER')", None, Some(&locals))?.extract(py)?;
+
+        // self.context.insert(Cow::from("asd"), PyString::new(py, user).into_object());
+    // }
+
+    pub fn render(&mut self) {
+        let mut p = MemProducer::new(&self.src, self.src.len());
         let mut c = TestConsumer{
             state: State::Beginning,
             counter: 0,
@@ -606,36 +692,42 @@ impl<'a> Article<'a> {
 }
 
 
-impl<'a> From<&'a str> for Article<'a> {
-    fn from(src: &'a str) -> Article<'a> {
-        let mut a = Article {
-            src: src.as_bytes(),
-            html: Cow::from(""),
-            links_internal: HashMap::new(),
-            files: HashMap::new(),
-            files_missing: HashSet::new(),
-            files_used: HashSet::new(),
-            links_internal_missing: HashSet::new(),
-        };
-        a.render();
-        a
-    }
-}
-impl<'a> From<&'a [u8]> for Article<'a> {
-    fn from(src: &'a [u8]) -> Article<'a> {
-        let mut a = Article {
-            src: src,
-            html: Cow::from(""),
-            files: HashMap::new(),
-            files_missing: HashSet::new(),
-            links_internal: HashMap::new(),
-            files_used: HashSet::new(),
-            links_internal_missing: HashSet::new(),
-        };
-        a.render();
-        a
-    }
-}
+// impl<'a> From<&'a str> for Article<'a> {
+//     fn from(src: &'a str) -> Article<'a> {
+//         let gil = Python::acquire_gil();
+//         let py = gil.python();
+//         let mut a = Article {
+//             src: src.as_bytes(),
+//             html: Cow::from(""),
+//             py: py,
+//             links_internal: HashMap::new(),
+//             context: HashMap::new(),
+//             files: HashMap::new(),
+//             files_missing: HashSet::new(),
+//             files_used: HashSet::new(),
+//             links_internal_missing: HashSet::new(),
+//         };
+//         // a.render();
+//         a
+//     }
+// }
+// impl<'a> From<&'a [u8]> for Article<'a> {
+//     fn from(src: &'a [u8]) -> Article<'a> {
+//         let mut a = Article {
+//             src: src,
+//             html: Cow::from(""),
+//             py: None,
+//             files: HashMap::new(),
+//             context: HashMap::new(),
+//             files_missing: HashSet::new(),
+//             links_internal: HashMap::new(),
+//             files_used: HashSet::new(),
+//             links_internal_missing: HashSet::new(),
+//         };
+//         a.render();
+//         a
+//     }
+// }
 
 
 pub trait ToHtml {
@@ -643,20 +735,20 @@ pub trait ToHtml {
 }
 
 impl<'a> ToHtml for Vec<Tag<'a>> {
-    fn to_html(&self, parser: &mut Article) -> Cow<str>
+    fn to_html(&self, article: &mut Article) -> Cow<str>
     {
         let parts: Vec<Cow<str>> = self.iter()
-            .map(|&ref x| x.to_html(parser))
+            .map(|&ref x| x.to_html(article))
             .collect();
         Cow::from(parts.join(""))
     }
 }
 
 impl<'a> ToHtml for Tag<'a> {
-    fn to_html(&self, parser: &mut Article) -> Cow<str>
+    fn to_html(&self, article: &mut Article) -> Cow<str>
     {
         match *self {
-            Tag::Container{ref c} => c.to_html(parser),
+            Tag::Container{ref c} => c.to_html(article),
             // {
             //     let children_strings: Vec<Cow<str>> = c.iter()
             //         .map(|&ref x| x.to_html(parser))
@@ -664,20 +756,25 @@ impl<'a> ToHtml for Tag<'a> {
             //     let s = children_strings.join("");
             //     Cow::from(s)
             // }
+
             Tag::Command{ref name, ref contents} => {
                 match &*name.to_string() {
-                    "youtube" => Cow::from(format!(r#"<iframe width="560" height="315" src="https://www.youtube.com/embed/{}" frameborder="0" allowfullscreen></iframe>"#, contents)),
+                    "youtube" => {
+                        // <div style="position: relative;padding-bottom: 56.25%; /* 16:9 */ padding-top: 25px;height: 0;"><iframe style="position: absolute;top: 0;left: 0;width: 100%;height: 100%;border:0px;" src="https://www.youtube.com/embed/HL-75xTzn6A"></iframe></div>
+                        Cow::from(format!(r#"<div style="position: relative;padding-bottom: 56.25%; /* 16:9 */ height: 0;"><iframe style="position: absolute;top: 0;left: 0;width: 100%;height: 100%;border:0px;" src="https://www.youtube.com/embed/{}"></iframe></div>"#, contents))
+                        // Cow::from(format!(youtube_format_str, contents))
+                    }
                     "file" => {
                         let sha1 = contents.trim();
-                        match parser.files.get(sha1) {
+                        match article.files.get(sha1) {
                             Some(f) => {
                                 // Cow::from(format!("<a href=\"{}\">{}</a>", l, text))
-                                parser.files_used.insert(String::from(sha1));
+                                article.files_used.insert(String::from(sha1));
 
                                 match &*f.contenttype.to_string() {
                                     "image" => {
                                         // Cow::from(format!("<a href=\"{}\">{}</a>", l, text))
-                                        parser.files_used.insert(String::from(sha1));
+                                        article.files_used.insert(String::from(sha1));
                                         Cow::from(format!("<img src=\"{}\"/>", sha1))
                                     },
                                     _ => {
@@ -690,8 +787,8 @@ impl<'a> ToHtml for Tag<'a> {
                                 // Cow::from(format!("file-{}", sha1))
                             },
                             None => {
-                                parser.files_used.insert(String::from(sha1));
-                                parser.files_missing.insert(String::from(sha1));
+                                article.files_used.insert(String::from(sha1));
+                                article.files_missing.insert(String::from(sha1));
                                 // Cow::from(format!("no-file-{}", sha1))
                                 Cow::from(format!(""))
                                 // parser.links_internal_missing.insert(String::from(page));
@@ -699,12 +796,40 @@ impl<'a> ToHtml for Tag<'a> {
                             }
                         }
                     },
+                    "expression" => {  // Jinja expression:  {{ var1 + var2 }}
+                        // <div style="position: relative;padding-bottom: 56.25%; /* 16:9 */ padding-top: 25px;height: 0;"><iframe style="position: absolute;top: 0;left: 0;width: 100%;height: 100%;border:0px;" src="https://www.youtube.com/embed/HL-75xTzn6A"></iframe></div>
+                        // Cow::from(format!(r#"<div style="position: relative;padding-bottom: 56.25%; /* 16:9 */ padding-top: 25px;height: 0;"><iframe style="position: absolute;top: 0;left: 0;width: 100%;height: 100%;border:0px;" src="https://www.youtube.com/embed/{}"></iframe></div>"#, contents))
+
+                        // let locals = PyDict::new(article.py);
+                        let res: String = match article.py.eval(
+                            &format!("str({})", contents),
+                            None,
+                            Some(&article.context)
+                        ) {
+                            Ok(s) => format!("{}", s),
+                            Err(err) => format!("Ошибка eval"),
+                        };
+                        // let res: String = article.py.eval(
+                        //     &format!("str({})", contents),
+                        //     None,
+                        //     Some(&article.context)
+                        // ).unwrap().extract().unwrap();
+                        Cow::from(res)
+
+                        // if let Some(py) = parser.py {
+                        //     let res: String = py.eval("1+2", None, None).unwrap().extract().unwrap();
+                        //     Cow::from(res)
+                        // } else {
+                        //     Cow::from("!No article.py!")
+                        // }
+
+                    }
                     _ => Cow::from(format!("Unknown command: \\{}", name)),
                 }
             },
             Tag::Paragraph{ref c} => {
                 let children_strings: Vec<Cow<str>> = c.iter()
-                    .map(|&ref x| x.to_html(parser))
+                    .map(|&ref x| x.to_html(article))
                     .collect();
                 let s = children_strings.join(" ");
                 Cow::from(format!("<p>{}</p>", &s))
@@ -717,10 +842,10 @@ impl<'a> ToHtml for Tag<'a> {
                     Some(ref x) => Cow::from(format!("<a href=\"/articles/{}\">{}</a>", x, text)),
                     None => {
                         let page = page.trim();
-                        match parser.links_internal.get(page) {
+                        match article.links_internal.get(page) {
                             Some(l) => Cow::from(format!("<a href=\"{}\">{}</a>", l, text)),
                             None => {
-                                parser.links_internal_missing.insert(String::from(page));
+                                article.links_internal_missing.insert(String::from(page));
                                 // parser.links_internal_missing.insert(Cow::from(page).to_owned());
                                 Cow::from(format!("<a class=\"redlink\" href=\"/articles/{}\">{}</a>", page, text))
                             }
@@ -748,7 +873,9 @@ impl<'a> ToHtml for Tag<'a> {
                                 let video_code = query.get("v");
                                 match video_code {
                                     // <iframe width="560" height="315" src="https://www.youtube.com/embed/g6ez7sbaiWc" frameborder="0" allowfullscreen></iframe>
-                                    Some(code) => Cow::from(format!(r#"<iframe width="560" height="315" src="https://www.youtube.com/embed/{}" frameborder="0" allowfullscreen></iframe>"#, code)),
+
+                                    Some(code) => Cow::from(format!(r#"<div style="position:relative;padding-bottom: 56.25%; /* 16:9 */ height: 0;"><iframe style="position: absolute;top: 0;left: 0;width: 100%;height: 100%;border:0px;" src="https://www.youtube.com/embed/{}"></iframe></div>"#, code)),
+                                    // Some(code) => Cow::from(format!(Cow::from(format!(youtube_format_str, contents)), code)),
                                     _ => Cow::from(format!(r#"<a href="{0}">{0}</a>"#, url))
                                 }
                             },
@@ -782,7 +909,7 @@ impl<'a> ToHtml for Tag<'a> {
 
             Tag::ListNumbered(ref items) => {
                 let parts: Vec<Cow<str>> = items.iter()
-                    .map(|&ref x| x.to_html(parser))
+                    .map(|&ref x| x.to_html(article))
                     .collect();
                 Cow::from(format!("<ol>{}</ol>", parts.join("")))
             },
@@ -796,7 +923,7 @@ impl<'a> ToHtml for Tag<'a> {
                 //     .collect();
                 // Cow::from(format!("<li>{}</li>", items.join("</li><li>")))
                 // Cow::from(format!("<ul>{}</ul>", items.join("")))
-                Cow::from(format!("<ul>{}</ul>", c.to_html(parser)))
+                Cow::from(format!("<ul>{}</ul>", c.to_html(article)))
 
                     // let parts: Vec<Cow<str>> = c.iter()
                 //     .map(|&ref x| x.to_html(parser))
@@ -807,13 +934,13 @@ impl<'a> ToHtml for Tag<'a> {
             // Tag::ListUnnumberedItem(ref txt) => Cow::from(format!("<li>{}</li>", txt)),
             Tag::ListUnnumberedItem(ref words) => {
                 let parts: Vec<Cow<str>> = words.iter()
-                    .map(|&ref x| x.to_html(parser))
+                    .map(|&ref x| x.to_html(article))
                     .collect();
                 Cow::from(format!("<li>{}</li>", parts.join(" ")))
             },
             Tag::ListItemNumbered(ref words) => {
                 let parts: Vec<Cow<str>> = words.iter()
-                    .map(|&ref x| x.to_html(parser))
+                    .map(|&ref x| x.to_html(article))
                     .collect();
                 Cow::from(format!("<li>{}</li>", parts.join(" ")))
             },
@@ -824,10 +951,10 @@ impl<'a> ToHtml for Tag<'a> {
             // https://codepen.io/wallaceerick/pen/ojtal
             Tag::CodeTabs(ref code_blocks) => {
                 if code_blocks.len() == 1 {
-                    code_blocks[0].to_html(parser)
+                    code_blocks[0].to_html(article)
                 } else {
                     let parts: Vec<Cow<str>> = code_blocks.iter()
-                        .map(|&ref x| x.to_html(parser))
+                        .map(|&ref x| x.to_html(article))
                         .collect();
 
                     Cow::from(format!(
@@ -966,6 +1093,38 @@ named_attr!(
         ({
             Tag::Command{
                 name: Cow::from(name),
+                contents: Cow::from(contents),
+            }
+        })
+    )
+);
+
+named_attr!(
+    #[doc = "Jinja set expression: `{% set variable1 = variable2 %}`"],
+    pub expression<Tag>,
+    do_parse!(
+        tag!("{{") >>
+        contents: map_res!(take_until!("}}"), from_utf8) >>
+        tag!("}}") >>
+        ({
+            Tag::Command {
+                name: Cow::from("expression"),
+                contents: Cow::from(contents),
+            }
+        })
+    )
+);
+
+named_attr!(
+    #[doc = "Jinja set expression: `{% set variable1 = variable2 %}`"],
+    pub jinjatag<Tag>,
+    do_parse!(
+        tag!("{%") >>
+        contents: map_res!(take_until!("%}"), from_utf8) >>
+        tag!("%}") >>
+        ({
+            Tag::Command {
+                name: Cow::from("jinjatag"),
                 contents: Cow::from(contents),
             }
         })
@@ -1260,8 +1419,9 @@ named!(pub url<Tag>,
     )
 );
 
-/// Main parser function
-named!(pub parse<Vec<Tag>>,
+named_attr!(
+    #[doc = "Main parser function"],
+    pub parse<Vec<Tag>>,
     do_parse!(
         opt!(take_while!(any_space)) >>
         pars: separated_list!(complete!(space_min2eol), complete!(root_element)) >>
@@ -1273,26 +1433,29 @@ named!(pub parse<Vec<Tag>>,
 
 
 named_attr!(
-    #[doc = "Line-start elements (0 position)"],
+    #[doc = "Line-start elements (line position == 0)"],
     line_start_element<Tag>,
     alt_complete!(
         code_tabs |
         complete!(list_numbered) |
+        complete!(list_unnumbered) |
         html_tag |
         header |
+        expression |
         command |
-        paragraph |
+        complete!(paragraph) |
         space_tag
     )
 );
 
 
 named_attr!(
-    #[doc = "Middle-line elements (> 0 position)"],
+    #[doc = "Middle-line elements (line position > 0)"],
     element<Tag>,
     alt_complete!(
         code_tabs |
         html_tag |
+        expression |
         command |
         paragraph |
         space_tag
@@ -1306,7 +1469,7 @@ named!(root_element<Tag>,
            complete!(list_numbered) |
            // paragraphs |
            command |
-           paragraph |
+           complete!(paragraph) |
            space_tag
        )
 );
@@ -1318,11 +1481,13 @@ named!(space_tag<Tag>,
        )
 );
 
-named!(symbols<Tag>,
-       do_parse!(
-           txt: map_res!(take_while1!(not_space), from_utf8) >>
-           (Tag::Text(Cow::from(txt)))
-       )
+named_attr!(
+    #[doc = "Anything but spaces and new lines"],
+    symbols<Tag>,
+    do_parse!(
+        txt: map_res!(take_while1!(not_space), from_utf8) >>
+        (Tag::Text(Cow::from(txt)))
+    )
 );
 
 named!(html_tag<Tag>,
@@ -1340,6 +1505,7 @@ named!(
         // many1!(word) => {|x| Tag::Comment} |
         internal_link |
         external_link |
+        expression |
         url |
         comment |
         html_tag |
@@ -1372,8 +1538,9 @@ named_attr!(
 "],
     pub paragraph<Tag>,
     do_parse!(
-        words: separated_nonempty_list!(
-            complete!(space_max1eol),
+        words: separated_nonempty_list_complete!(
+            space_max1eol,
+            // word
             alt_complete!(
                 words |     // 2 "words" with no space between them
                 word        // single "word"
@@ -1562,9 +1729,27 @@ mod tests {
             ]})
         );
 
-        // "link + text"
+        // 2 elements without space - it is 1 paragraph:
         // assert_eq!(
-        //     paragraph(&b"[[page | title]]txt"[..]),
+        //     paragraph(&b"https://www.youtube.com/watch?v=g6ez7sbaiWc"[..]),
+        //     Done(&b""[..], Tag::Paragraph{c: vec![
+        //         Tag::Text(Cow::from("1")),
+        //         Tag::Text(Cow::from("2"))
+        //     ]})
+        // );
+
+        // assert_eq!(
+        //     paragraph(Cow::from("Так даже лучше. Если Вы находитесь в другом городе, тогда это вообще единственный вариант. Но и в Москве Вы сэкономите деньги и время, потомуasdasd что не надо будет их тратить на поездку по городу.").as_bytes()),
+        //     // paragraph(Cow::from("abc\n").as_bytes()),
+        //     Done(&b""[..], Tag::Paragraph{c: vec![
+        //         Tag::Text(Cow::from("1")),
+        //         // Tag::Text(Cow::from("2"))
+        //     ]})
+        // );
+
+        // no spaces between paragraph "words" - still 1 paragraph
+        // assert_eq!(
+        //     paragraph(&b"[[page1 | title1]][[page2 | title2]]"[..]),
         //     Done(&b""[..], Tag::Paragraph{c: vec![
         //         Tag::Text(Cow::from("1")),
         //         Tag::Text(Cow::from("2"))
@@ -1609,24 +1794,6 @@ mod tests {
         // }
     }
 
-    // #[test]
-    // fn test_par_separator() {
-    //     let mut tests = HashMap::new();
-    //     // tests.insert(&b"\r\n"[..], Done(&b""[..], &b"\r\n\r\n"[..]));
-    //     for (input, expected) in &tests {assert_eq!(paragraph_separator(input), *expected);}
-    // }
-
-    // #[test]
-    // fn test_word_separator() {
-    //     let mut tests = HashMap::new();
-    //     // tests.insert(&b"\n\n"[..], Error(error_position!(ErrorKind::ManyTill, &b"\n"[..])));
-    //     tests.insert(&b"\n\n"[..], Done(&b"\n"[..], Tag::Space));
-    //     tests.insert(&b"     \n "[..], Done(&b""[..], Tag::Space));
-    //     // assert_eq!(multi(&c[..]), Error(error_position!(ErrorKind::ManyTill,&c[..])));
-    //     // for (input, expected) in &tests {assert_eq!(word_separator(input), *expected);}
-    //     for (input, expected) in &tests {assert_eq!(word_separator(input), *expected);}
-    // }
-
     #[test]
     fn test_list_item_content(){
         let mut tests = HashMap::new();
@@ -1660,6 +1827,39 @@ mod tests {
     }
 
     #[test]
+    fn test_expression(){
+        let mut tests = HashMap::new();
+        let s = "{{exp.total_seconds() / 60 / 60 / 24 / 365.25}}";
+        tests.insert(s, Done(
+            &b""[..],
+            Tag::Command{
+                name: Cow::from("expression"),
+                contents: Cow::from("exp.total_seconds() / 60 / 60 / 24 / 365.25")
+            }
+        ));
+        for (input, expected) in tests {
+            assert_eq!(expression(input.as_bytes()), expected);
+        }
+
+
+        let gil = Python::acquire_gil();
+        let py = gil.python();
+        let mut a = Article::new(py);
+        // a.py = Some(py);
+        a.src = "{{ 'asd'+'111' }}".as_bytes();
+        a.render();
+        assert_eq!(a.html, "asd111");
+
+        a.src = "{{ datetime.datetime.now() - datetime.datetime(2013, 1, 1) }}".as_bytes();
+        a.render();
+        // assert_eq!(a.html, "asd111");
+
+        a.src = "{{ no_such_variable }}".as_bytes();
+        a.render();
+        assert_eq!(a.html, "Ошибка eval");
+    }
+
+    #[test]
     fn test_code_tabs(){
         let mut tests = HashMap::new();
         tests.insert(
@@ -1684,6 +1884,7 @@ mod tests {
         // tests.insert("* 123 \n* asd ", "<ul><li>123</li><li>asd</li></ul>");
         tests.insert("1", "<p>1</p>");
         tests.insert("1 2", "<p>1 2</p>");
+
         tests.insert("  1  \n\n 2  ", "<p>1</p><p>2</p>");
 
         // This is not a header (a line starts from a space symbol)
@@ -1726,20 +1927,16 @@ mod tests {
 
 
         for (input, expected) in tests {
-            let a = Article::from(input);
-            // let r = match parse(input) {
-            //     Done(_, tag) => {tag.to_html(&)},
-            //     _ => "error".to_string()
-            // };
-            // assert_eq!(parse(input.as_bytes()), Done(&b""[..], Tag::Space));
-            assert_eq!(a.html, *expected);
+            // let a = Article::from(input);
+            // assert_eq!(a.html, *expected);
         }
     }
 
     #[test]
-    #[ignore]
+    // #[ignore]
     fn test_parse() {
         let mut tests = HashMap::new();
+
         tests.insert(
             &b"1"[..],
             Done(&b""[..], vec![
@@ -1762,6 +1959,8 @@ mod tests {
                 )
             ])
         );
+
+
         for (input, expected) in &tests {assert_eq!(parse(input), *expected);}
     }
 }
@@ -1781,7 +1980,7 @@ mod test {
     fn parser() {
         let mut map = HashMap::new();
         map.insert(Cow::from("page 1 "), Cow::from(" text"));
-        Article::from("[[page 1 | text]]");
+        // Article::from("[[page 1 | text]]");
         // assert_eq!(p.links, map!(Cow::from("page 1 ") => Cow::from(" text")));
         // assert_eq!(p.links, map);
     }

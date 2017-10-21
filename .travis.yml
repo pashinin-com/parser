@@ -82,9 +82,12 @@ install:
 script:
   # - cargo build --verbose
   - cargo test --verbose --release
+  # - RUSTFLAGS='-C target-feature=-crt-static' python setup.py bdist_wheel  # for musl
   - python setup.py bdist_wheel
-  - (cd build/lib/; python -c "import rparser")
-  - (cd rparser; ln -sf ../build/lib/rparser/librparser.so librparser.so)
+  # - (cd build/lib/; python -c "import rparser")
+  # - (cd rparser; ln -sf ../build/lib/rparser/librparser.so librparser.so)
+  - cp -f target/release/librparser.so rparser.so
+  - python -c 'import rparser;print(rparser.__version__)'
   - python setup.py test
   # - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then docker run --rm -v `pwd`:/io $DOCKER_IMAGE $PRE_CMD /io/build-wheels.sh $TRAVIS_OS_NAME; fi
   # - ls wheelhouse/

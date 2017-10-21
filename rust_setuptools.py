@@ -71,7 +71,10 @@ class RustBuildCommand(Command):
             # Execute cargo.
             try:
                 toml = os.path.join(crate_path, 'Cargo.toml')
-                args = ['cargo', 'build']
+                args = [
+                    'cargo', 'build',
+                    # '--target=x86_64-unknown-linux-musl',
+                ]
                 # args = ['cargo', 'rustc', '--release', '--', '-C', 'prefer-dynamic']
                 if not self.debug:
                     args.append('--release')
@@ -115,10 +118,14 @@ class RustBuildCommand(Command):
 
             target = os.path.join(target, dest)
 
+            print('copy .so from {} to {}'.format(dylib_path, target))
             for filename in os.listdir(dylib_path):
                 if filename.endswith(DYNAMIC_LIB_SUFFIX):
+                    target_file = filename
+                    if target_file.startswith('lib'):
+                        target_file = target_file[3:]
                     shutil.copy(os.path.join(dylib_path, filename),
-                                os.path.join(target, filename))
+                                os.path.join(target, target_file))
 
 
 def build_rust_cmdclass(crates, debug=False,

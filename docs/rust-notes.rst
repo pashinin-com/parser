@@ -8,7 +8,13 @@ For Linux & Mac:
 
 .. code-block:: bash
 
-   curl -sSf https://static.rust-lang.org/rustup.sh | sh
+   sudo pacman -S rustup
+   # or
+   # curl -sSf https://static.rust-lang.org/rustup.sh | sh
+
+   # rustup default stable
+   rustup default nightly
+   rustup target add x86_64-unknown-linux-musl
 
 
 See version of Rust:

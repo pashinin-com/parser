@@ -1,28 +1,32 @@
 [package]
 name = "rparser"
-version = "0.1.12"
+version = "0.1.23"
 authors = ["Sergey Pashinin <sergey@pashinin.com>"]
 
 
 [lib]
 name = "rparser"
-crate-type = ["dylib"]
+crate-type = ["cdylib"]  # .so
+# cdylib is smaller than dylib
 # dylib, rlib, staticlib
+# rlib is "rust" static lib (with some info for rust)
 
 
 [dependencies]
-nom = "^3.0"
+nom = "^3.2"
 # pulldown-cmark = "*"
 
 # cpython = "0.1"
 # cpython = { git = "https://github.com/dgrunwald/rust-cpython.git" }
 # cpython = { path = "/usr/data/local2/src/rust-cpython" }
 
-[dependencies.cpython]
+[dependencies.pyo3]
+# [dependencies.cpython]
 # path = "/usr/data/local2/src/rust-cpython"
-git = "https://github.com/pashinin/rust-cpython.git"
+# git = "https://github.com/pashinin/rust-cpython.git"
 # git = "https://github.com/dgrunwald/rust-cpython.git"
 # version = "0.1"
+version = "0.2.2"
 default-features = false
 # features = ["python27-sys"]
 # features = ["python3-sys"]
@@ -32,8 +36,11 @@ default-features = false
 
 
 [features]
-default = ["cpython/python3-sys"]
-py2 = ["python", "cpython/python27-sys"]
-py3 = ["python", "cpython/python3-sys"]
+default = ["python", "pyo3/python3"]
+py2 = ["python", "pyo3/python2"]
+py3 = ["python", "pyo3/python3"]
+# default = ["python", "cpython/python3-sys"]
+# py2 = ["python", "cpython/python27-sys"]
+# py3 = ["python", "cpython/python3-sys"]
 python = []
 unstable = []
