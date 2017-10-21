@@ -67,12 +67,14 @@ install:
   # - sh ~/rustup.sh --prefix=/usr/local --spec=stable -y 2> /dev/null
   - sh ~/rustup.sh --prefix=/usr/local --spec=nightly -y 2> /dev/null
   - ls -la /usr/local/bin
+  - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/python/3.6/lib
   # - curl -sL https://static.rust-lang.org/rustup.sh -o ~/rust-installer/rustup.sh
   # - sh ~/rust-installer/rustup.sh --prefix=~/rust --spec=stable -y --disable-sudo 2> /dev/null
   # - curl https://sh.rustup.rs -sSf | sh -s -- -y
   # - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then docker pull $DOCKER_IMAGE; fi
 
 script:
+  - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/python/3.6/lib
   - cargo test --verbose --release
   # - RUSTFLAGS='-C target-feature=-crt-static' python setup.py bdist_wheel  # for musl
   - python setup.py bdist_wheel
