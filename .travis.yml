@@ -52,11 +52,9 @@ before_install:
 install:
   - pip install wheel
   - curl -sL https://static.rust-lang.org/rustup.sh -o ~/rustup.sh
-  - sh ~/rustup.sh --prefix=/usr/local --spec=$RUST --disable-sudo -y 2> /dev/null
+  - sh ~/rustup.sh --prefix=/usr/local --spec=nightly --disable-sudo -y
   - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/python/3.6/lib:/opt/python/3.5/lib:/opt/python/2.7/lib
-  # - curl -sL https://static.rust-lang.org/rustup.sh -o ~/rust-installer/rustup.sh
   # - sh ~/rust-installer/rustup.sh --prefix=~/rust --spec=stable -y --disable-sudo 2> /dev/null
-  # - curl https://sh.rustup.rs -sSf | sh -s -- -y
   # - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then docker pull $DOCKER_IMAGE; fi
 
 script:
