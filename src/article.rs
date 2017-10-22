@@ -37,27 +37,19 @@ use pyo3::prelude::*;
 use pyo3::PyTryInto;
 // use std::io::Beginning
 
-
-// use cpython::{Python, PythonObject, PyObject, ToPyObject, PyTuple, PyString, PyResult, PyDict};
-
-
 // const youtube_format_str: &'static str = r#"<div style="position:relative;padding-bottom: 56.25%; /* 16:9 */ padding-top: 25px;height: 0;"><iframe style="position: absolute;top: 0;left: 0;width: 100%;height: 100%;border:0px;" src="https://www.youtube.com/embed/{}"></iframe></div>"#;
 // fn format_youtube(&'str code) -> String {
 //     format!(, code)
 // }
 
-// allowed_html_tags = HashMap::new();
-// allowed_html_tags.insert(Cow::from("table"));
-
-
-// const BROWSERS: &'static [&'static str] = &["firefox", "chrome"];
 const ALLOWED_HTML_TAGS: &'static [&'static str] = &[
-    "table",
-    "tr",
-    "td",
-    "p",
     "b",
-    "div"
+    "div",
+    "hr",
+    "p",
+    "table",
+    "td",
+    "tr",
 ];
 
 #[derive(PartialEq,Eq,Debug)]
