@@ -6,6 +6,23 @@ from rust_setuptools import (build_rust_cmdclass, build_install_lib_cmdclass,
 from setuptools.command.test import test as TestCommand
 
 
+def build_native(spec):
+    # build an example rust library
+    build = spec.add_external_build(
+        cmd=['cargo', 'build', '--release'],
+        path='./rust'
+    )
+
+    spec.add_cffi_module(
+        module_path='example._native',
+        dylib=lambda: build.find_dylib('example', in_path='target/release'),
+        header_filename=lambda: build.find_header(
+            'example.h',
+            in_path='target'
+        )
+    )
+
+
 class PyTest(TestCommand):
     user_options = [('pytest-args=', 'a', "Arguments to pass into py.test")]
 
@@ -47,6 +64,11 @@ setup(
     author='Sergey Pashinin',
     author_email='sergey@pashinin.com',
     url='https://github.com/pashinin-com/rparser',
+    # setup_requires=['milksnake'],
+    # install_requires=['milksnake'],
+    # milksnake_tasks=[
+    #     build_native
+    # ],
     requires=[],
     packages=[  # directories to include
         # 'rparser'

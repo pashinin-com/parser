@@ -1,6 +1,6 @@
 [package]
 name = "rparser"
-version = "0.1.25"
+version = "0.1.26-dev"
 authors = ["Sergey Pashinin <sergey@pashinin.com>"]
 
 
@@ -13,12 +13,15 @@ crate-type = ["cdylib"]  # .so
 
 
 [dependencies]
-nom = "^3.2"
+nom = "^3.2.1"
 # pulldown-cmark = "*"
 
 # cpython = "0.1"
 # cpython = { git = "https://github.com/dgrunwald/rust-cpython.git" }
 # cpython = { path = "/usr/data/local2/src/rust-cpython" }
+
+[build-dependencies]
+cbindgen = "0.1"
 
 [dependencies.pyo3]
 # [dependencies.cpython]
@@ -26,7 +29,7 @@ nom = "^3.2"
 # git = "https://github.com/pashinin/rust-cpython.git"
 # git = "https://github.com/dgrunwald/rust-cpython.git"
 # version = "0.1"
-version = "0.2.2"
+version = "0.2.3"
 default-features = false
 # features = ["python27-sys"]
 # features = ["python3-sys"]
